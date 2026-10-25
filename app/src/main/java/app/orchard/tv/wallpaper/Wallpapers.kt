@@ -85,6 +85,8 @@ object Wallpapers {
     private val dailyDir by lazy { File(app.filesDir, "daily").apply { mkdirs() } }
     private val photoDir by lazy { File(app.filesDir, "photos").apply { mkdirs() } }
     private val liveFrame by lazy { File(app.filesDir, "live-frame.jpg") }
+    /** The video wallpaper's stopped frame, kept apart from the aerial films' one (their cards and pictures differ). */
+    private val videoFrame by lazy { File(app.filesDir, "video-frame.jpg") }
     private val bakedDir by lazy { File(app.filesDir, "backdrop").apply { mkdirs() } }
     private val thumbs = HashMap<String, Bitmap>()
 
@@ -229,8 +231,10 @@ object Wallpapers {
         // Until a film has stopped on a frame, the first built-in stands in.
         WallpaperKind.Live -> liveFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
             ?: Gradients.render(Gradients.presets.first(), w, h)
-        // The video wallpaper's picture is the first video's first frame, until one has stopped.
-        WallpaperKind.Video -> firstVideoFrame(w, h) ?: Gradients.render(Gradients.presets.first(), w, h)
+        // The video wallpaper's picture is the frame it last stopped on, else the first video's
+        // first frame.
+        WallpaperKind.Video -> videoFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
+            ?: firstVideoFrame(w, h) ?: Gradients.render(Gradients.presets.first(), w, h)
     }
 
     /** The first frame of the first uploaded video, for the picture and the thumbnail. */
@@ -303,8 +307,8 @@ object Wallpapers {
         val stamp = when (wp.kind) {
             WallpaperKind.Daily, WallpaperKind.Photo -> fileFor(wp)?.lastModified() ?: 0L
             WallpaperKind.Live -> liveFrame.lastModified()
-            // The videos folder's mtime: the picture is the first video's first frame until a film stops.
-            WallpaperKind.Video -> File(app.filesDir, "screensaver-videos").lastModified()
+            // The stopped frame's file, and the videos folder's mtime (the first-frame picture).
+            WallpaperKind.Video -> maxOf(videoFrame.lastModified(), File(app.filesDir, "screensaver-videos").lastModified())
             else -> 0L
         }
         return "${wp.id}|$stamp|${screenW}x$screenH|${BuildConfig.VERSION_CODE}"
@@ -372,8 +376,10 @@ object Wallpapers {
         if (selectedId != LIVE && selectedId != VIDEO) return
         backdropJob?.cancel()
         prefs.edit { putString("live_film", film).putLong("live_at", atMs) }
+        // Each kind keeps its stopped frame in its own file: the cards' thumbnails read them.
+        val frameFile = if (selectedId == VIDEO) videoFrame else liveFrame
         val (bmp, frost) = withContext(Dispatchers.Default) {
-            runCatching { liveFrame.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) } }
+            runCatching { frameFile.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) } }
                 .onFailure { Log.w(TAG, "could not keep the film's frame", it) }
             // Frosted before shading, which draws on the frame itself.
             val frost = Images.frost(frame)

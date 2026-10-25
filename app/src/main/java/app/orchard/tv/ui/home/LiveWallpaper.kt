@@ -125,6 +125,9 @@ fun LiveWallpaper(
 ) {
     val context = LocalContext.current
     var player by remember { mutableStateOf<ExoPlayer?>(null) }
+    // Which wallpaper selection the player was opened for: the aerial films and the owner's videos
+    // need different players, so a change of selection rebuilds it.
+    var openedFor by remember { mutableStateOf<String?>(null) }
     var surface by remember { mutableStateOf<SurfaceView?>(null) }
     // Frames are reaching the screen: the first one has been drawn and the film is not stopped.
     var showing by remember { mutableStateOf(false) }
@@ -147,6 +150,7 @@ fun LiveWallpaper(
         reader.close()
         player?.release()
         player = null
+        openedFor = null
         live.player = null
         live.film = null
         live.stopped = false
@@ -239,8 +243,10 @@ fun LiveWallpaper(
         }
     }
 
-    fun open(): ExoPlayer =
-        if (Wallpapers.selectedId == Wallpapers.VIDEO) openLocal() else openAerial()
+    fun open(): ExoPlayer {
+        openedFor = Wallpapers.selectedId
+        return if (Wallpapers.selectedId == Wallpapers.VIDEO) openLocal() else openAerial()
+    }
 
     // The film on screen, opened ahead for its frames (see FrameReader), and a small key frame
     // taken every few seconds while it moves: the glass for wherever it stops is then at hand.
@@ -260,9 +266,13 @@ fun LiveWallpaper(
         }
     }
 
-    LaunchedEffect(play) {
+    // Keyed on the selection too: switching between the aerial films and the owner's videos while
+    // playing must rebuild the player, whose playlist comes from somewhere else.
+    LaunchedEffect(play, Wallpapers.selectedId) {
         live.stopped = false
         if (play) {
+            // The selection changed while a player was up: it plays the other playlist, so rebuild.
+            if (player != null && openedFor != Wallpapers.selectedId) release()
             val p = player ?: open().also { player = it }
             DiagLog.i("wallpaper film starts (state ${p.playbackState}, ${p.currentMediaItem?.mediaId} at ${p.currentPosition} ms)")
             // Its decoder was let go for the screensaver (LiveFilm.letDecoderGo).
@@ -281,6 +291,16 @@ fun LiveWallpaper(
             }
             p.pause()
             if (cover.value > 0f) {
+                if (Wallpapers.selectedId == Wallpapers.VIDEO) {
+                    // The video wallpaper never bakes a stopped frame: no PixelCopy, no decode, no
+                    // disk writes while the viewer is moving around (that read as dropped frames).
+                    // The still picture fades in over the paused frame, and the film goes on from
+                    // the paused moment when Home comes back.
+                    cover.animateTo(0f, tween(320, easing = Motion.EaseOut))
+                    delay(KEEP_STOPPED_MS)
+                    release()
+                    return@LaunchedEffect
+                }
                 // The stopped frame becomes the picture; once Home has it, the film can go. Where
                 // the video plane cannot be read, the same moment is decoded from the 1080p file:
                 // first the key frame before it, small, which is all the glass needs, so the plate
