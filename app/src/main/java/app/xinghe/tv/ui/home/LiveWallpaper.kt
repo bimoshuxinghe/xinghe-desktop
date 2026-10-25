@@ -303,12 +303,14 @@ fun LiveWallpaper(
             p.pause()
             if (cover.value > 0f) {
                 if (Wallpapers.videoSelected) {
-                    // The video wallpaper never bakes a stopped frame: no PixelCopy, no decode, no
-                    // disk writes while the viewer is moving around (that read as dropped frames).
-                    // The still picture fades in over the paused frame, and the film goes on from
-                    // the paused moment when Home comes back.
-                    cover.animateTo(0f, tween(320, easing = Motion.EaseOut))
+                    // Whatever opened over Home stands over the paused film, not over a picture
+                    // nobody chose: no frame is baked for the video wallpaper, so giving way to
+                    // the baked one unfolded the fallback gradient behind every menu. The paused
+                    // frame is Home's own picture, exactly as it stood, and the film goes on from
+                    // the paused moment when Home asks again. It lets its decoder go — these TVs
+                    // have one video path — once a panel has clearly been left open.
                     delay(KEEP_STOPPED_MS)
+                    cover.snapTo(0f)
                     release()
                     return@LaunchedEffect
                 }
