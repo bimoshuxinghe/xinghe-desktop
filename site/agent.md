@@ -88,52 +88,52 @@ curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=<IP> bash
 
 3. 授予只有 adb 能给的权限（某条报错可以忽略，继续下一条）：
    ```
-   adb shell pm grant app.orchard.tv android.permission.ACCESS_FINE_LOCATION
-   adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-   adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
-   adb shell appops set app.orchard.tv WRITE_SETTINGS allow
-   adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES allow
-   adb shell appops set app.orchard.tv GET_USAGE_STATS allow
-   adb shell appops set app.orchard.tv android:get_usage_stats allow
-   adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-   adb shell appops set app.orchard.tv APP_AUTO_START allow
-   adb shell appops set app.orchard.tv APP_ASSOC_START allow
-   adb shell cmd package compile -m speed -f app.orchard.tv
+   adb shell pm grant app.xinghe.tv android.permission.ACCESS_FINE_LOCATION
+   adb shell pm grant app.xinghe.tv android.permission.WRITE_SECURE_SETTINGS
+   adb shell appops set app.xinghe.tv SYSTEM_ALERT_WINDOW allow
+   adb shell appops set app.xinghe.tv WRITE_SETTINGS allow
+   adb shell appops set app.xinghe.tv REQUEST_INSTALL_PACKAGES allow
+   adb shell appops set app.xinghe.tv GET_USAGE_STATS allow
+   adb shell appops set app.xinghe.tv android:get_usage_stats allow
+   adb shell cmd notification allow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
+   adb shell appops set app.xinghe.tv APP_AUTO_START allow
+   adb shell appops set app.xinghe.tv APP_ASSOC_START allow
+   adb shell cmd package compile -m speed -f app.xinghe.tv
    ```
    最后两条 `appops` 只有 TCL 认，别的电视报错是正常的。`compile` 要几十秒，让 Aerial 在电视上更流畅。
 
 4. 屏保：运行 `adb shell settings get secure screensaver_enabled`。结果是 `1` 时再运行：
    ```
-   adb shell settings put secure screensaver_components app.orchard.tv/app.orchard.tv.dream.AerialDream
-   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez own_screensaver true
+   adb shell settings put secure screensaver_components app.xinghe.tv/app.xinghe.tv.dream.AerialDream
+   adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez own_screensaver true
    ```
 
 5. 保持 ADB 常开（用户同意时；小米待机唤醒后会自己关掉 ADB，开了这项以后升级更方便）：
    ```
-   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true
+   adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez keep_adb true
    ```
 
-6. 启动 Aerial：`adb shell am start -W -n app.orchard.tv/.MainActivity`，输出里要有 `Status: ok`。
+6. 启动 Aerial：`adb shell am start -W -n app.xinghe.tv/.MainActivity`，输出里要有 `Status: ok`。
 
 7. 设为默认桌面（装的是 guard 版时跳过）：
    ```
-   adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.orchard.tv
+   adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.xinghe.tv
    ```
-   报错时改用 `adb shell cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity`。小米、TCL 等固件会无视这一步，没关系，下一步的桌面守护会接管。
+   报错时改用 `adb shell cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity`。小米、TCL 等固件会无视这一步，没关系，下一步的桌面守护会接管。
 
-   **海信 VIDAA**：先运行 `adb shell getprop persist.vt.use_home_pkg`。有输出（比如 `com.jamdeo.tv.vod`）且不是 `app.orchard.tv` 时，记下原值并改成 Aerial：
+   **海信 VIDAA**：先运行 `adb shell getprop persist.vt.use_home_pkg`。有输出（比如 `com.jamdeo.tv.vod`）且不是 `app.xinghe.tv` 时，记下原值并改成 Aerial：
    ```
    adb shell settings put global aerial_vt_home_pkg <原值>
-   adb shell setprop persist.vt.use_home_pkg app.orchard.tv
+   adb shell setprop persist.vt.use_home_pkg app.xinghe.tv
    ```
    没有输出就跳过，其他电视没有这个属性。
 
-8. 桌面守护：Aerial 启动时会自己打开它。运行 `adb shell settings get secure enabled_accessibility_services`，结果里应该有 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`。没有时手动加上，**保留原来的内容**，用冒号连接：
+8. 桌面守护：Aerial 启动时会自己打开它。运行 `adb shell settings get secure enabled_accessibility_services`，结果里应该有 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`。没有时手动加上，**保留原来的内容**，用冒号连接：
    ```powershell
-   adb shell "settings put secure enabled_accessibility_services '<原来的值>:app.orchard.tv/app.orchard.tv.guard.HomeGuardService'"
+   adb shell "settings put secure enabled_accessibility_services '<原来的值>:app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService'"
    adb shell settings put secure accessibility_enabled 1
    ```
-   原来的值是 `null` 或空时，只写 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`。在 PowerShell 里，原来的值中如果有 `$`，要写成 `` `$ ``。
+   原来的值是 `null` 或空时，只写 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`。在 PowerShell 里，原来的值中如果有 `$`，要写成 `` `$ ``。
 
    有的固件上 `settings` 命令会卡住不返回（腾讯极光盒子 6 / Q5043，等 120 秒后断开）：那就跳过这一步，改用 `adb shell dumpsys accessibility` 看 `Enabled services` 里有没有 Aerial，Aerial 拿到授权后会自己打开守护。
 
@@ -147,7 +147,7 @@ curl.exe -fL -o Aerial.apk https://aerial.qust.me/download/aerial-guard.apk
 curl.exe -fL -o tcast-push.py https://aerial.qust.me/tools/tcast-push.py
 adb reverse tcp:8765 tcp:8765
 Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1' -WindowStyle Hidden
-python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.orchard.tv Aerial 0 180
+python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.xinghe.tv Aerial 0 180
 ```
 
 运行最后一条后，请用户在电视右上角的提示里**先按「右」再按确认，选「同意」**。脚本打印装好后，结束 `python -m http.server` 进程，运行 `adb reverse --remove tcp:8765`，再回到上面 Windows 第 3 条。
@@ -159,22 +159,22 @@ python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.orchard.tv Aerial
 逐条运行，把**原始输出**贴给用户：
 
 ```
-adb shell "dumpsys package app.orchard.tv | grep versionName"
+adb shell "dumpsys package app.xinghe.tv | grep versionName"
 adb shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 adb shell settings get secure enabled_accessibility_services
-adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.orchard.tv)'"
+adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.xinghe.tv)'"
 adb shell input keyevent KEYCODE_HOME
 adb shell "sleep 3; dumpsys window | grep mCurrentFocus"
 ```
 
 - 第 1 条有 `versionName`：已安装。
-- 第 2 条是系统给出的默认桌面。小米仍然是 PatchWall（`com.mitv.tvhome`）、TCL 仍然是自己的桌面时正常，守护接管；是 `app.orchard.tv` 更好。
-- 第 3 条有 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`：守护已打开（原生 Android TV 已是默认桌面时可能没有，看第 6 条即可）。
+- 第 2 条是系统给出的默认桌面。小米仍然是 PatchWall（`com.mitv.tvhome`）、TCL 仍然是自己的桌面时正常，守护接管；是 `app.xinghe.tv` 更好。
+- 第 3 条有 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`：守护已打开（原生 Android TV 已是默认桌面时可能没有，看第 6 条即可）。
 - 第 4 条大于 0：守护正在运行。
-- **第 6 条包含 `app.orchard.tv`：按主页键进入 Aerial，安装成功。** 这一条不满足，就不能告诉用户装好了。
+- **第 6 条包含 `app.xinghe.tv`：按主页键进入 Aerial，安装成功。** 这一条不满足，就不能告诉用户装好了。
 - 第 2、3、6 条的原始输出必须贴给用户，不要只说「成功」。第 2 条报错（老系统没有 `cmd`）时，改用 `adb shell pm resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME`。
 
-第 6 条不是 `app.orchard.tv` 时，等 5 秒再运行一次第 5、6 条（有的电视守护启动得慢）。还不是，看「常见情况」。
+第 6 条不是 `app.xinghe.tv` 时，等 5 秒再运行一次第 5、6 条（有的电视守护启动得慢）。还不是，看「常见情况」。
 
 `input keyevent` 模拟的主页键不经过守护的按键过滤，在少数电视上（索尼 Android 9）结果和实体遥控器不同：这时请用户用实体遥控器按一次主页键，再只运行第 6 条，以这次为准。
 
@@ -193,23 +193,23 @@ curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s restore
 Windows 逐条运行：
 
 ```
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb false --ez own_screensaver false
-adb shell cmd notification disallow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-adb shell pm revoke app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW default
-adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES default
-adb shell appops set app.orchard.tv APP_AUTO_START default
-adb shell appops set app.orchard.tv APP_ASSOC_START default
-adb shell am force-stop app.orchard.tv
-adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard.tv
+adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez keep_adb false --ez own_screensaver false
+adb shell cmd notification disallow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
+adb shell pm revoke app.xinghe.tv android.permission.WRITE_SECURE_SETTINGS
+adb shell appops set app.xinghe.tv SYSTEM_ALERT_WINDOW default
+adb shell appops set app.xinghe.tv REQUEST_INSTALL_PACKAGES default
+adb shell appops set app.xinghe.tv APP_AUTO_START default
+adb shell appops set app.xinghe.tv APP_ASSOC_START default
+adb shell am force-stop app.xinghe.tv
+adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.xinghe.tv
 ```
 
 然后：
 
-- `adb shell settings get secure screensaver_components` 是 `app.orchard.tv/...` 时，用 `adb shell settings get secure screensaver_default_component` 的结果写回去：`adb shell settings put secure screensaver_components <默认值>`。
-- `adb shell settings get secure enabled_accessibility_services`：从结果里去掉 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`（和它前后多余的冒号），其他服务原样保留写回；只剩它自己时运行 `adb shell settings delete secure enabled_accessibility_services`。
-- 海信 VIDAA：`adb shell settings get global aerial_vt_home_pkg` 有值（不是 `null`）时，运行 `adb shell setprop persist.vt.use_home_pkg <这个值>` 和 `adb shell settings delete global aerial_vt_home_pkg`。没有值、但 `adb shell getprop persist.vt.use_home_pkg` 是 `app.orchard.tv`（1.15 及以前手动改过）并且装有 `com.jamdeo.tv.vod` 时，运行 `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`。
-- 要卸载时 `adb uninstall app.orchard.tv`。
+- `adb shell settings get secure screensaver_components` 是 `app.xinghe.tv/...` 时，用 `adb shell settings get secure screensaver_default_component` 的结果写回去：`adb shell settings put secure screensaver_components <默认值>`。
+- `adb shell settings get secure enabled_accessibility_services`：从结果里去掉 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`（和它前后多余的冒号），其他服务原样保留写回；只剩它自己时运行 `adb shell settings delete secure enabled_accessibility_services`。
+- 海信 VIDAA：`adb shell settings get global aerial_vt_home_pkg` 有值（不是 `null`）时，运行 `adb shell setprop persist.vt.use_home_pkg <这个值>` 和 `adb shell settings delete global aerial_vt_home_pkg`。没有值、但 `adb shell getprop persist.vt.use_home_pkg` 是 `app.xinghe.tv`（1.15 及以前手动改过）并且装有 `com.jamdeo.tv.vod` 时，运行 `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`。
+- 要卸载时 `adb uninstall app.xinghe.tv`。
 - 最后 `adb shell input keyevent KEYCODE_HOME`，电视回到原来的桌面。
 
 ## 常见情况
@@ -221,10 +221,10 @@ adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard
 - **雷鸟 55S595C Ultra（MT9655）等只有「无线调试」的机型**：拿不到授权，能装但接管不了主页键。
 - **海信 VIDAA**：第 7 步改了 `persist.vt.use_home_pkg` 以后，主页键直接进 Aerial；但开机仍会先进聚好看（固件在开机完成前拦截第三方 App），按一次主页键即可。
 - **Vidda 其他系统、OPPO K9、雷鸟鹤 6**：能装，但开机进不了 Aerial（固件只认自家桌面，除非删掉原桌面，这里不做）。可以把 Aerial 当普通 App 用。
-- **验收第 4 条是 0，但第 3 条里有 Aerial**：常见于升级之后，系统还在找旧的安装目录（小米 Android 9，#72）。运行 `adb shell am force-stop app.orchard.tv`，等 3 秒，再 `adb shell am start -W -n app.orchard.tv/.MainActivity`，然后重新验收。macOS / Linux 也可以直接运行 `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair`。
+- **验收第 4 条是 0，但第 3 条里有 Aerial**：常见于升级之后，系统还在找旧的安装目录（小米 Android 9，#72）。运行 `adb shell am force-stop app.xinghe.tv`，等 3 秒，再 `adb shell am start -W -n app.xinghe.tv/.MainActivity`，然后重新验收。macOS / Linux 也可以直接运行 `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair`。
 - **用了一段时间后按主页键又回到原桌面**：同上，先试一次上面的强停再打开。
-- **验收第 4 条是 0，第 3 条里也没有 Aerial**：有的固件拦截侧载的无障碍服务。请用户在电视的安全中心或权限管理里允许 Aerial 自启动、无障碍，然后重新运行 `adb shell am start -n app.orchard.tv/.MainActivity` 再验收。
-- **忘了家长密码**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_pin true`，密码就关掉了。
+- **验收第 4 条是 0，第 3 条里也没有 Aerial**：有的固件拦截侧载的无障碍服务。请用户在电视的安全中心或权限管理里允许 Aerial 自启动、无障碍，然后重新运行 `adb shell am start -n app.xinghe.tv/.MainActivity` 再验收。
+- **忘了家长密码**：`adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez clear_pin true`，密码就关掉了。
 - **不支持**：LG webOS、三星 Tizen、华为智慧屏（鸿蒙）、Android 4.4 及更老的电视（Aerial 最低要 Android 5.0）。极米 H3、老乐视、荣耀智慧屏、老康佳（看不到版本号）等打不开 ADB 的机型也暂时没办法。
 
 ## 用户常问

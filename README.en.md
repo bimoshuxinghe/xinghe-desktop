@@ -90,7 +90,7 @@ At the end, paste the raw output of these commands from the "Check" section, not
 - adb shell "dumpsys window | grep mCurrentFocus" after pressing Home
 ```
 
-Phone apps and web chats, including Doubao on a phone, only tell you the steps; they can't run anything. Use a desktop build that can (Doubao for desktop or Doubao Work, WorkBuddy, Qwen for desktop, Trae, Claude Code, Codex…). When the agent says it's done, check that the `mCurrentFocus` output it pastes includes `app.orchard.tv`.
+Phone apps and web chats, including Doubao on a phone, only tell you the steps; they can't run anything. Use a desktop build that can (Doubao for desktop or Doubao Work, WorkBuddy, Qwen for desktop, Trae, Claude Code, Codex…). When the agent says it's done, check that the `mCurrentFocus` output it pastes includes `app.xinghe.tv`.
 
 **Without a computer**: users have installed Aerial with the phone apps Beetle ADB (甲壳虫 ADB 助手) and Super Xiaoai (超级小爱); we haven't tested each one. The steps are the same as the Windows ones above; once it's installed, run the check from a computer if you can (see [Check](site/en/agent.md#check-required)).
 
@@ -105,10 +105,10 @@ curl -fsSL https://aerial.qust.me/install.sh | KEEP_ADB=1 TV=192.168.1.20 bash
 ```bash
 adb connect 192.168.1.20:5555
 adb install -r aerial-standard.apk
-adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
-adb shell am start -n app.orchard.tv/.MainActivity
+adb shell pm grant app.xinghe.tv android.permission.WRITE_SECURE_SETTINGS
+adb shell cmd notification allow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
+adb shell appops set app.xinghe.tv SYSTEM_ALERT_WINDOW allow
+adb shell am start -n app.xinghe.tv/.MainActivity
 ```
 
 On Windows, use an agent, or follow the Windows steps in the [install guide](site/en/agent.md).

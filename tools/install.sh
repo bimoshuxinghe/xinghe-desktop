@@ -33,7 +33,7 @@ REPO=pengchujin/aerial-tv
 command -v adb >/dev/null || { echo "adb not found. macOS: brew install android-platform-tools; Linux: install android-tools / adb." >&2; exit 1; }
 FLAVOR="${1:-standard}"
 case "$FLAVOR" in standard|guard|repair) ;; *) echo "flavor must be standard or guard (or repair)" >&2; exit 1 ;; esac
-PKG=app.orchard.tv
+PKG=app.xinghe.tv
 GUARD="$PKG/$PKG.guard.HomeGuardService"
 
 export ANDROID_HOME="${ANDROID_HOME:-$HOME/Library/Android/sdk}"
@@ -60,7 +60,7 @@ fi
 # MiTV-MFTP0 (Android 9) kept the entry while system_server still pointed at the old APK directory
 # and never bound it (issue #72).
 # Some firmwares show the class name where the label goes (Xiaomi MiTV-ASTP0, Android 9, issue #183).
-guard_bound() { adb shell dumpsys accessibility 2>/dev/null | grep -q -E "label=(Aerial|app\.orchard\.tv)"; }
+guard_bound() { adb shell dumpsys accessibility 2>/dev/null | grep -q -E "label=(Aerial|app\.xinghe\.tv)"; }
 
 wait_guard() {
   for _ in $(seq 1 "$1"); do sleep 1; guard_bound && return 0; done

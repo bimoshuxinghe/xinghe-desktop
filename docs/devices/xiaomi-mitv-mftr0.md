@@ -8,7 +8,7 @@
 
 ## HOME 锁定
 
-- `cmd role add-role-holder android.app.role.HOME app.orchard.tv` 和 `cmd package set-home-activity` 都返回成功，但 `resolve-activity` 仍然返回 `com.mitv.tvhome`。
+- `cmd role add-role-holder android.app.role.HOME app.xinghe.tv` 和 `cmd package set-home-activity` 都返回成功，但 `resolve-activity` 仍然返回 `com.mitv.tvhome`。
 - 原因：`com.android.server.pm.MitvSettings.isThirdpartyHomeAllowed(pkg)` → `isAppInWhitelistWithFlag(pkg, 4)`。白名单来自 `/data/system/mitv_features.xml` 和 `persist.appcontrol_*` 属性，只有系统进程能写。
 - **不要停用 `com.mitv.tvhome`**：停用后 HOME 解析到 FallbackHome，而 FallbackHome 也不认第三方 HOME，会一直黑屏并刷日志「User unlocked but no home」。实测过，之后已立即 `pm enable` 还原。
 - 解决办法：桌面守护（无障碍）。原桌面一到前台就切回 Aerial；按 HOME 时实测从按下到 Aerial 显示约 0.5 秒，中间会闪一下原桌面。
@@ -27,7 +27,7 @@
 ## 开机时 HDMI-CEC 自动切信号源（1.15 修复）
 
 - 用户反馈：接了 Apple TV（CEC），开机时电视显示「正在连接 HDMI」，随即被拉回 Aerial。
-- 原因：待机唤醒后守护服务被复活，`onServiceConnected` 立刻接管桌面，不看前台是什么。复现方法：`am force-stop app.orchard.tv` 后马上用 `EXTSRC_PLAY`（`input` 23）打开 HDMI 1，日志里 `ExternalSourceActivity` 比守护绑定早 130ms 启动，接着被 Aerial 盖住。
+- 原因：待机唤醒后守护服务被复活，`onServiceConnected` 立刻接管桌面，不看前台是什么。复现方法：`am force-stop app.xinghe.tv` 后马上用 `EXTSRC_PLAY`（`input` 23）打开 HDMI 1，日志里 `ExternalSourceActivity` 比守护绑定早 130ms 启动，接着被 Aerial 盖住。
 - 修复：复活、开机、亮屏这三种情况都等 1.5 秒再接管，期间如果有原桌面以外的窗口到了前台（信号源、别的 App），就不动它。`BootReceiver` 在守护已运行时不再直接打开 Aerial。
 - 注意：覆盖安装后 2 分钟内，守护不会因为「被复活」而接管（防止打断正在看的内容），测这条路径要等 2 分钟。
 
@@ -87,7 +87,7 @@
 
 - 1.11 起按 HOME 会先让原桌面到前台。之前 MainActivity 设了 `excludeFromRecents="true"`：Aerial 在这里不是系统认可的 HOME，它的任务一离开前台就会被系统清理（`wm_destroy_activity ... finish-imm:recent-task-trimmed`）。守护服务拉回来时，只能新建一个 MainActivity，焦点于是总回到第一个 App。
 - 守护服务原来用 `CATEGORY_HOME` 拉回 Aerial，系统因此另开一个 `type=home` 的任务，同样会新建界面。现在统一用 `MainActivity.bringBackIntent`（只有 ACTION_MAIN，复用同一个任务），并去掉了 `excludeFromRecents`。
-- 查法：`adb logcat -b events | grep orchard` 看有没有 `wm_create_activity` 和 `recent-task-trimmed`；`dumpsys activity recents` 里应该只有一个 `type=standard` 的 Aerial 任务。
+- 查法：`adb logcat -b events | grep xinghe` 看有没有 `wm_create_activity` 和 `recent-task-trimmed`；`dumpsys activity recents` 里应该只有一个 `type=standard` 的 Aerial 任务。
 
 ## 应用内升级（2026-10-22，未发版代码）
 

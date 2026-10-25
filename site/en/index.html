@@ -290,7 +290,7 @@
       </details>
       <details>
         <summary>The agent says it's installed, but nothing changed on the TV?</summary>
-        <p>Some agents report success without running anything. Ask it to paste the raw output from "Check" in the <a href="agent.md">install guide</a>: which home screen <code>resolve-activity</code> finds, whether <code>enabled_accessibility_services</code> contains <code>app.orchard.tv</code>, and the <code>mCurrentFocus</code> after pressing Home. The install only worked if the last one includes <code>app.orchard.tv</code>.</p>
+        <p>Some agents report success without running anything. Ask it to paste the raw output from "Check" in the <a href="agent.md">install guide</a>: which home screen <code>resolve-activity</code> finds, whether <code>enabled_accessibility_services</code> contains <code>app.xinghe.tv</code>, and the <code>mCurrentFocus</code> after pressing Home. The install only worked if the last one includes <code>app.xinghe.tv</code>.</p>
       </details>
       <details>
         <summary>Can I install it with only a phone?</summary>
@@ -344,14 +344,14 @@ The install guide is here: ${guide}
 Read the whole guide before you start. Then run the commands yourself on my computer; don't just tell me the steps. Tell me when I need to do something on the TV.
 At the end, paste the raw output of these commands from the "Check" section, not just "it worked":
 - adb shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME" (which home screen it finds)
-- adb shell settings get secure enabled_accessibility_services (does it contain app.orchard.tv/app.orchard.tv.guard.HomeGuardService?)
+- adb shell settings get secure enabled_accessibility_services (does it contain app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService?)
 - adb shell "dumpsys window | grep mCurrentFocus" after pressing Home
 If it did not work, tell me exactly which step failed.`,
     restore: (ip, guide) =>
 `Please follow the "Undo" section of ${guide} to give my TV (IP address: ${ip}) its original home screen back, without uninstalling Aerial.
 Run the commands yourself on my computer; don't just send me the steps.
 At the end, paste the raw output of:
-- adb shell settings get secure enabled_accessibility_services (it should no longer contain app.orchard.tv)
+- adb shell settings get secure enabled_accessibility_services (it should no longer contain app.xinghe.tv)
 - adb shell "dumpsys window | grep mCurrentFocus" after pressing Home (it should be the TV's original home screen)`,
   };
 </script>

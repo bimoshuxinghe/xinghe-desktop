@@ -5,7 +5,7 @@
 - 零售型号：TCL **75V2**；`ro.product.device` / `ro.product.model` = `sugarcane`；固件 `V8-S48CT05-LF1V142`（MS848C 机芯）。
 - 平台 MStar **m7221**（`ro.board.platform` / `ro.hardware`），1920×1080，240dpi；Android **8.0.0**（SDK 26），`OPR5.170623.014 dev-keys`。
 - 原桌面：`com.tcl.cyberui/.MainActivity`。
-- 安装的 flavor：**`standard`**（`versionName 1.33`，`md5 fe1e1a8bb455abb9217eb56d7b956ff4`）。注意 `standard` 包内**同样带 guard 组件**（`guard/BootReceiver`、`guard/HomeGuardService`、`guard/RevivalSyncService`、`guard/RevivalAccountService`），并非只有 `guard` flavor 才有；本机 `enabled_accessibility_services` 里就有 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`，`dumpsys activity processes` 也能看到它对 system_server 的 `FGSA` 绑定，即守护在运行。
+- 安装的 flavor：**`standard`**（`versionName 1.33`，`md5 fe1e1a8bb455abb9217eb56d7b956ff4`）。注意 `standard` 包内**同样带 guard 组件**（`guard/BootReceiver`、`guard/HomeGuardService`、`guard/RevivalSyncService`、`guard/RevivalAccountService`），并非只有 `guard` flavor 才有；本机 `enabled_accessibility_services` 里就有 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`，`dumpsys activity processes` 也能看到它对 system_server 的 `FGSA` 绑定，即守护在运行。
 - 开机直达的主路径不依赖守护：固件的 `persist.sys.launcher.component` 直接拉起 Aerial（见下）。守护的作用是 HOME 被抢后切回来。
 - 全程只用 `adb shell` 权限，**没用 root**。测试日期 2026-10-22 / 23。
 
@@ -108,21 +108,21 @@ adb install aerial-standard.apk                    # Success
 TCL 在 AMS 里改了 `setDefaultLauncher()`，开机时读这个属性直接拉起指定组件：
 
 ```bash
-adb shell cmd package set-home-activity app.orchard.tv/.MainActivity
-adb shell setprop persist.sys.launcher.component app.orchard.tv/app.orchard.tv.MainActivity
+adb shell cmd package set-home-activity app.xinghe.tv/.MainActivity
+adb shell setprop persist.sys.launcher.component app.xinghe.tv/app.xinghe.tv.MainActivity
 ```
 
 两点要注意：
 
-- 格式必须是**完整类名** `包名/类全名`。写成 `app.orchard.tv/.MainActivity`（相对类名）会黑屏。
+- 格式必须是**完整类名** `包名/类全名`。写成 `app.xinghe.tv/.MainActivity`（相对类名）会黑屏。
 - **它不校验组件有没有声明 HOME**，给任何 Activity 都能用。
 
 实测（真重启，从 adb 恢复起每 0.5 秒采样 48 次）：
 
 ```
 T+0s   发出 reboot
-T+27s  adb 恢复，前台已是 app.orchard.tv/.MainActivity
-T+27s ~ T+57s  48 次采样全部为 app.orchard.tv/.MainActivity
+T+27s  adb 恢复，前台已是 app.xinghe.tv/.MainActivity
+T+27s ~ T+57s  48 次采样全部为 app.xinghe.tv/.MainActivity
 ```
 
 `mResumedActivity` 全程没出现过 `com.tcl.cyberui`；连按 3 次 Home 也停在同一 task。
@@ -132,13 +132,13 @@ T+27s ~ T+57s  48 次采样全部为 app.orchard.tv/.MainActivity
 
 ```bash
 adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME
-# 正常：直接输出 app.orchard.tv/.MainActivity，且 isDefault=true
+# 正常：直接输出 app.xinghe.tv/.MainActivity，且 isDefault=true
 # 不正常：输出 com.android.internal.app.ResolverActivity，isDefault=false
 ```
 
-出现 `ResolverActivity` 说明 HOME 有多个候选、没有唯一默认（这台两个候选 `com.tcl.cyberui` 和 `app.orchard.tv` 都声明了 HOME）。这时按 Home 键可能弹选择框，开机启动路径也可能先把原桌面拉起来——`com.tcl.cyberui` 起来后会读「当前桌面是谁」，读到 `app.orchard.tv` 又不是自己，在 `FKPageConfigManager.setIs4KEnv` 里抛 `SecurityException: Package app.orchard.tv does not belong to 1000` 自杀（见「已知问题」第 3 条）。
+出现 `ResolverActivity` 说明 HOME 有多个候选、没有唯一默认（这台两个候选 `com.tcl.cyberui` 和 `app.xinghe.tv` 都声明了 HOME）。这时按 Home 键可能弹选择框，开机启动路径也可能先把原桌面拉起来——`com.tcl.cyberui` 起来后会读「当前桌面是谁」，读到 `app.xinghe.tv` 又不是自己，在 `FKPageConfigManager.setIs4KEnv` 里抛 `SecurityException: Package app.xinghe.tv does not belong to 1000` 自杀（见「已知问题」第 3 条）。
 
-`cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity` 就是把这条补上：执行前 `dumpsys package | grep -A10 'Preferred Activities'` 里 `mMatch=0x0`，执行后变 `mMatch=0x100000 mAlways=true`，`resolve-activity` 也从 Resolver 变成直接命中。
+`cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity` 就是把这条补上：执行前 `dumpsys package | grep -A10 'Preferred Activities'` 里 `mMatch=0x0`，执行后变 `mMatch=0x100000 mAlways=true`，`resolve-activity` 也从 Resolver 变成直接命中。
 **注意**：`adb install -r` 覆盖升级后这条记录可能被 PMS 重算，升级完要复查一次。
 
 建议其他 TCL 机型先探一下有没有默认值：`getprop persist.sys.launcher.component`，再核一次 `resolve-activity`。
@@ -150,7 +150,7 @@ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c 
 开机 logo 消失后黑屏约 2 秒才出画面。system_server 把 MainActivity 创建了 3 次，前 2 次崩：
 
 ```
-13:00:17.003  am_proc_start: [0,3166,10009,app.orchard.tv,activity,app.orchard.tv/.MainActivity]
+13:00:17.003  am_proc_start: [0,3166,10009,app.xinghe.tv,activity,app.xinghe.tv/.MainActivity]
 13:00:17.388  am_crash: java.lang.IllegalStateException,
               SharedPreferences in credential encrypted storage are not available
               until after user is unlocked, ContextImpl.java,389
@@ -177,17 +177,17 @@ adb shell cmd package resolve-activity --brief -a android.intent.action.MAIN -c 
 ```
 08:42:24.8  am_create_activity: com.tcl.cyberui/.MainActivity   ← 前台被抢
 08:42:25.9  am_crash: com.tcl.cyberui  SecurityException:
-            Package app.orchard.tv does not belong to 1000
+            Package app.xinghe.tv does not belong to 1000
             at FKPageConfigManager.setIs4KEnv
-08:42:25.9  am_finish_activity: app.orchard.tv/.MainActivity, force-crash   ← Aerial 被连带结束
+08:42:25.9  am_finish_activity: app.xinghe.tv/.MainActivity, force-crash   ← Aerial 被连带结束
 08:42:26.0  Aerial 重建，恢复前台
 ```
 
 **不是「默认桌面掉了」，而是从来没在 Android 层设过唯一默认。** 固件的 `persist.sys.launcher.component` 只管「开机拉谁」，HOME 的解析结果另算：两个包都声明了 HOME，`resolve-activity` 落到 `ResolverActivity`、`isDefault=false`（见「开机直达」一节的自检命令）。这种状态下某些启动路径会先把原桌面拉起来。
 
-cyberui 起来后以 uid 1000 去读 Settings 里的「当前桌面包」，读到 `app.orchard.tv` 又不是自己，在 `FKPageConfigManager.setIs4KEnv` 撞 uid 校验自杀，顺手把 Aerial force-crash 一次。属固件侧行为，Aerial 无过错。
+cyberui 起来后以 uid 1000 去读 Settings 里的「当前桌面包」，读到 `app.xinghe.tv` 又不是自己，在 `FKPageConfigManager.setIs4KEnv` 撞 uid 校验自杀，顺手把 Aerial force-crash 一次。属固件侧行为，Aerial 无过错。
 
-**修复**：`cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity`（执行后 `isDefault=true`）。
+**修复**：`cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity`（执行后 `isDefault=true`）。
 
 **真重启复验**（2026-10-23 09:36，`adb reboot` 完整冷启动）：
 
@@ -197,7 +197,7 @@ cyberui 起来后以 uid 1000 去读 Settings 里的「当前桌面包」，读�
 | `com.tcl.cyberui` 的 `am_crash` | 1 次（`setIs4KEnv`） | **0 次** |
 | `am_proc_start` | 有 | 只有 1 次 `[added application]`，空进程 |
 | Aerial 被 force-crash | 有 | 无（只剩 CE 存储那 2 次） |
-| 前台采样 | 闪一下 TCL 再回 Aerial | 10 次连续采样全是 `app.orchard.tv/.MainActivity` |
+| 前台采样 | 闪一下 TCL 再回 Aerial | 10 次连续采样全是 `app.xinghe.tv/.MainActivity` |
 
 重连过程：`adb reboot` → 35 秒后 adb 恢复（uptime 26.85s）→ 前台已是 Aerial。剩余问题只有「CE 存储未解锁导致前 2 次创建崩溃」那条（见「已知问题」第 1 条），即约 2 秒黑屏。
 
@@ -208,11 +208,11 @@ cyberui 起来后以 uid 1000 去读 Settings 里的「当前桌面包」，读�
 
 ```
 09:45:33  am_crash: com.android.packageinstaller  SecurityException:
-          Package app.orchard.tv does not belong to 10011
+          Package app.xinghe.tv does not belong to 10011
           at Settings.Global.getStringForUser
 ```
 
-与上面第 2 条同一类：调用方把自身 uid 与 `app.orchard.tv` 一起当 opPackageName 送进 Settings 的 binder 调用，
+与上面第 2 条同一类：调用方把自身 uid 与 `app.xinghe.tv` 一起当 opPackageName 送进 Settings 的 binder 调用，
 被服务端按「包必须属于调用 uid」拒。**升级只能 `adb install -r`。**
 
 ### 4. 信源面板固定列出 4 个 HDMI（实际 2 口）
@@ -250,8 +250,8 @@ adb connect <tv-ip>:5555
 adb shell setprop persist.sys.matrix.mi.enable 1
 adb shell setprop ctl.restart zygote                    # 软重启让开关生效
 adb install aerial-standard.apk
-adb shell cmd package set-home-activity app.orchard.tv/.MainActivity
-adb shell setprop persist.sys.launcher.component app.orchard.tv/app.orchard.tv.MainActivity
+adb shell cmd package set-home-activity app.xinghe.tv/.MainActivity
+adb shell setprop persist.sys.launcher.component app.xinghe.tv/app.xinghe.tv.MainActivity
 
 # 还原
 adb shell setprop persist.sys.launcher.component ""

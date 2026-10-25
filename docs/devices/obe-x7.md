@@ -18,12 +18,12 @@
 
 ```bash
 # 打开（'*' = 任何识别为 Apple TV 的输入；也可以写确切的输入 id）
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --es cec_home_input '*'
+adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --es cec_home_input '*'
 # 别的固件：指定播放器包名和「当前输入」的设置键
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver \
+adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver \
   --es cec_home_input '*' --es cec_home_player '<包名>' --es cec_home_input_setting '<设置键>'
 # 关闭
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --es cec_home_input ''
+adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --es cec_home_input ''
 ```
 
 日志 tag `AerialGuard`：识别结果（`CEC input=… manualApple=… apple=…`）、两帧的写入结果、长按和双击。`input keyevent` 注入的按键不经过无障碍过滤，要用实体遥控器或 `sendevent` 测。

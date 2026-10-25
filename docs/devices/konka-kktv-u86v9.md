@@ -7,7 +7,7 @@
 ## 安装、首次启动与 ADB
 
 - 用户报告内置文件管理器拒绝安装 APK；经其他途径安装后，安装器点“打开”提示“无法运行此应用”，原桌面“我的应用”也没有 Aerial。首次成功侧载的路线记录不完整，不能当作可复现教程；启动异常根因未确定。
-- 活动启动器可显式启动 `app.orchard.tv.MainActivity`。**活动启动器 2.4.1 在本机无法用遥控器完成所需操作，用户连接 USB 鼠标才完成操作并打开 Aerial**，下述路线目前需要鼠标。
+- 活动启动器可显式启动 `app.xinghe.tv.MainActivity`。**活动启动器 2.4.1 在本机无法用遥控器完成所需操作，用户连接 USB 鼠标才完成操作并打开 Aerial**，下述路线目前需要鼠标。
 - 普通设置和活动搜索中未找到开发者/无障碍入口，DevEnabler 的“打开开发者选项”失败。
 - 实测 ADB 入口：活动启动器 → `com.konka.kkfactory.FactoryHome` → **软件调试功能 → 打开adbd**。开启后可连接网络 ADB，**adb root权限保持关闭**；不修改面板、校准、复位或升级参数。
 - 后续建议（未实现）：提供遥控器适配的活动启动器版本，支持焦点、方向键、确认和返回，减少鼠标依赖；本补丁不包含活动启动器改造。
@@ -19,7 +19,7 @@
 本机没有可打开的「安装未知应用」设置页，安装授权最初为默认值，1.40 因而在下载前报错。连接 ADB 后，为 Aerial 补齐这项授权即可走通上述流程（`tools/install.sh` 已包含）：
 
 ```bash
-adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES allow
+adb shell appops set app.xinghe.tv REQUEST_INSTALL_PACKAGES allow
 ```
 
 该授权保留供后续更新使用，安装仍需在系统安装器中确认。撤销时将 `allow` 换为 `default`，`tools/restore.sh` 也会复原。1.41 已有「授权设置页不存在时继续交给安装器」的兜底，但本机没有验证撤销授权后能否直接安装，不能据此省略授权步骤。

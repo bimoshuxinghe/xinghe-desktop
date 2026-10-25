@@ -6,7 +6,7 @@
 # If you disabled the stock launcher by hand, also: adb shell pm enable <its package>
 set -euo pipefail
 : "${TV:?set TV to the TV IP address}"
-PKG=app.orchard.tv
+PKG=app.xinghe.tv
 GUARD="$PKG/$PKG.guard.HomeGuardService"
 case "$TV" in *:*) SERIAL="$TV" ;; *) SERIAL="$TV:5555" ;; esac
 export ANDROID_SERIAL="$SERIAL"

@@ -45,7 +45,7 @@
 {
   "action": "android.intent.action.MAIN",
   "category": null,
-  "component": { "pkg": "app.orchard.tv", "cls": "app.orchard.tv.MainActivity" },
+  "component": { "pkg": "app.xinghe.tv", "cls": "app.xinghe.tv.MainActivity" },
   "extraList": [ { "type": 0, "key": "k", "value": "v" } ],
   "flagList": [268435456],
   "launchType": 1

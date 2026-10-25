@@ -34,7 +34,7 @@
   - `ConfigReceiver` 新增 `peek_next_row`、`home_plate`、`show_all_names`。
   - 新增机型笔记 `docs/devices/skyworth-coocaa.md`、`tencent-aurora-box.md`，`hisense-vidaa.md` 补了 #285、#323；`site/agent.md` 第 8 步补了 `settings` 卡死的固件。
 - 同一版（1.39）：发版前的检查。#258 原来在拿到 Bing 列表之前就删掉每日精选缓存，而且没有 `market` 文件也算市场变了：升级后第一次如果没联网，选好的每日一图会显示不出来，中文用户也会白白重下 8 张。现在没有文件就当作 `zh-CN`，等新市场的列表拿到再删。lint 找出两个 1.38 以前就有的 Android 5 问题：`GuardSetup.noteRevival` 用了 6.0 才有的 `getSystemService(Class)`（复活时会崩），以及建账号还要 `AUTHENTICATE_ACCOUNTS`（maxSdk 22）。在 Android 5.0 模拟器（`aerial21`）上验证过：账号建出来了；守护被关掉后同步框架把它开回来，没有崩溃。小米 MFTR0（standard）和 TCL MT5879（guard，多屏互动推送）都装了，守护绑定正常，主页键能回到 Aerial（TCL 上用多屏互动注入的 HOME 要等 5 秒，因为不经过按键过滤，真遥控器不受影响）。完整 lint 剩 10 个错误，都是 1.38 以前就有的。
-- 同一版（1.39）：多语言。合并了社区的俄语、乌克兰语、哈萨克语翻译（#246–#248）、手机页多语言和右上角语言切换（#252：手机语言不在五种之内时默认英文，以前一律中文）、非中文电视的每日精选用英文说明（#258：`mkt=en-US`，切换时清掉按日期命名的缓存图）。补了三份译文缺的 16 条（1.38 新加的文字）和手机页漏翻的「跟随壁纸」提示；手机页 `.row` 盖掉 `hidden` 导致诊断框一直显示的问题也修了。控制中心的日期改用 `java.text.SimpleDateFormat`（ICU）：经过 desugar 的 java.time 给出的是月份独立形式，俄语成了「23 октябрь」，现在是「23 октября」。小米 MFTR0 上用 `cmd locale set-app-locales app.orchard.tv --locales ru-RU` 看过控制中心、个性化（包括新补的「Никогда」）和日期，测完已恢复成跟随系统，中文日期不变。手机页只用 node 校验了翻译表（五种语言各 81 条），没在手机上打开。译文没有母语者审过。
+- 同一版（1.39）：多语言。合并了社区的俄语、乌克兰语、哈萨克语翻译（#246–#248）、手机页多语言和右上角语言切换（#252：手机语言不在五种之内时默认英文，以前一律中文）、非中文电视的每日精选用英文说明（#258：`mkt=en-US`，切换时清掉按日期命名的缓存图）。补了三份译文缺的 16 条（1.38 新加的文字）和手机页漏翻的「跟随壁纸」提示；手机页 `.row` 盖掉 `hidden` 导致诊断框一直显示的问题也修了。控制中心的日期改用 `java.text.SimpleDateFormat`（ICU）：经过 desugar 的 java.time 给出的是月份独立形式，俄语成了「23 октябрь」，现在是「23 октября」。小米 MFTR0 上用 `cmd locale set-app-locales app.xinghe.tv --locales ru-RU` 看过控制中心、个性化（包括新补的「Никогда」）和日期，测完已恢复成跟随系统，中文日期不变。手机页只用 node 校验了翻译表（五种语言各 81 条），没在手机上打开。译文没有母语者审过。
 - **1.40（versionCode 43），2026-10-23 发布**（[v1.40](https://github.com/pengchujin/aerial-tv/releases/tag/v1.40)）：原桌面磁贴（#110、#98）。只声明了 HOME、没有启动器入口的原桌面（TCL 的 `com.tcl.cyberui`，名称「T-UI」，图标是默认机器人）现在也作为磁贴列出来，名称「原桌面」，用 Aerial 自己画的主页图标（`SystemTile.Home`）。守护在运行时用它识别出的原桌面，否则用 priority ≥ 0 的其他 HOME。已有入口的（小米 PatchWall）不变。打开时走 `HomeGuardService.openStockLauncher`。TCL MT5879（guard）上验证过：磁贴出现在网格末尾，点开停在 T-UI，9 秒内不被拉回；按主页键（多屏互动注入）回到 Aerial。小米 MFTR0 上没有多出磁贴。
 - **1.39（versionCode 42），2026-10-23 发布**（[v1.39](https://github.com/pengchujin/aerial-tv/releases/tag/v1.39)）：合并的 PR。#260（焦点缩放放到 `focusable` 之后，个性化左右移焦点不再整页抖）、#251（控制中心开着时每 3 秒刷新守护状态和亮度）、#344（控制中心二级页尺寸瞬切、只淡入淡出）、#306（极米 GMUI 的设置和网络走导出的 `com.xgimi.newsettings.SettingService`，作者的分支在组织 fork 里推不了，由我 rebase 到 1.38 的网络候选页列表后并入，并加了第一批 JVM 测试：JUnit + Robolectric，`./gradlew :app:testStandardDebugUnitTest`，11 个通过），文档 #237、#280、#226。小米 MFTR0 上看过合并后的版本：信号源二级页、网络按钮（小米 Wi-Fi 页，返回回到 Aerial）、守护正常；极米没有真机。#346 已关（被 #347 包含）。还开着、已回复修改意见的：#347（小米 TvService 背光：写死的事务号要核对、增量起点、保留背光条兜底、rebase）、#334（Direct Boot 要做数据迁移、PIN 不放 DE）、#233（本机 adbd 授权有风险，建议拆分）、#218（只留图标部分 rebase）、#345（rebase 到网络候选页）；等维护者定方向的：#348、#296、#83、#319，以及新来的 #352（高对比度焦点框贴边变细）、#353（自动轮换壁纸）。
 - **1.38（versionCode 41），2026-10-23 发布**（[v1.38](https://github.com/pengchujin/aerial-tv/releases/tag/v1.38)）：第一排玻璃底板上也能显示名称（「App 名称：全部显示」时放在底板里，底板加高）；单排时「第二排：露出一点 / 不露出」（不露出时第一排再往下放，底板离下沿和离左右一样 30dp）；开机时打开某个 App（长按菜单；控制中心显示当前选的是哪个，选择、更换、取消时顶部有提示）；信号源里加「USB」，打开电视自带的 U 盘播放器。小米 MFTR0 上看过底板名称、隐藏第二排、网格排距、长按菜单、USB 打开高清播放器，以及带 `EXTRA_WOKE` 拉起时打开选好的 App；遥控器关机再开机后也打开了选好的 App（2026-10-23 15:12）。TCL 也装了（多屏互动推送，用 ADB 点「同意」），信号源页的 USB 打开了媒体中心。高对比度白框下底板名称的位置没在真机上看过。
@@ -122,7 +122,7 @@ TV=<ip> tools/restore.sh [--uninstall]                  # 撤销所有授权和�
 
 ```bash
 adb -s $XIAOMI_TV:5555 install -r app/build/outputs/apk/standard/release/app-standard-release.apk
-adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
+adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.xinghe.tv
 ```
 
 覆盖安装会保留之前的授权；守护服务由 App 启动时自己恢复。
@@ -143,17 +143,17 @@ adb -s $XIAOMI_TV:5555 shell cmd package compile -m speed -f app.orchard.tv
 ## 调试技巧
 
 - **截图**：`adb shell screencap -p /data/local/tmp/x.png && adb pull ...`（小米用 `/data/local/tmp`，TCL 用 `/sdcard`）。用完要删掉。
-- **帧率**：`adb shell dumpsys gfxinfo app.orchard.tv reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
-- **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|app.orchard.tv)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
+- **帧率**：`adb shell dumpsys gfxinfo app.xinghe.tv reset`，操作几下，再执行 `... framestats`，看 `SwapBuffers→GpuCompleted` 这一段的耗时。
+- **守护状态**：`dumpsys accessibility | grep -E "label=(Aerial|app.xinghe.tv)"`（有输出就是已绑定；小米 ASTP0 上标签显示成类名）；日志 tag 是 `AerialGuard`。
 - **壁纸**：日志 tag 是 `AerialWallpaper`。
-- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity app.orchard.tv/.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/app.orchard.tv/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
+- **logcat 看不到 App 日志的电视**（创维 7T631_T60）：`adb shell dumpsys activity app.xinghe.tv/.MainActivity` 末尾打印 `DiagLog` 最近的记录（启动、显示模式、绘制、按键、焦点、屏保、加载耗时）；诊断版（`./gradlew -Pdiag ...`，版本名带 `-diag`）或 `ConfigReceiver --ez diag true` 之后还写进 `/sdcard/Android/data/app.xinghe.tv/files/aerial-diag.log`，可以 `adb pull`。试验开关（下次启动生效）：`--ez mode_switch false` 不切刷新率（诊断版默认就不切），`--ez soft_layer true` 用软件绘制首页。
 - **机型适配信息**：`TV=<ip> tools/report.sh`（只读）生成可以贴进 issue 的 `aerial-report-<机型>.md`，macOS 上顺便复制到剪贴板；用户也可以在手机页最下面「反馈问题」里复制。issue 表单是 `.github/ISSUE_TEMPLATE/device.yml`。内容和隐私边界见 ARCHITECTURE.md「诊断报告」。
-- **测应用内升级**：`ConfigReceiver --ez check_update true` 立刻检查；`--ez update_test true` 让「下载并安装」用推到 `Android/data/app.orchard.tv/files/update-test.apk` 的包（测完删掉这个文件）。见 ARCHITECTURE.md「升级」。
+- **测应用内升级**：`ConfigReceiver --ez check_update true` 立刻检查；`--ez update_test true` 让「下载并安装」用推到 `Android/data/app.xinghe.tv/files/update-test.apk` 的包（测完删掉这个文件）。见 ARCHITECTURE.md「升级」。
 - **手机配置页**：令牌不写日志，从电视截图里识别二维码即可：`swift tools/qr-from-screenshot.swift shot.png`。
-- **立即预览屏保**：`adb shell am start -a app.orchard.tv.PREVIEW_SCREENSAVER -n app.orchard.tv/.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
-- **模拟小米的待机清理**：`adb shell am force-stop app.orchard.tv`，然后看日志里出现 `revived by the notification listener binding`。
-- **配置**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true`。
-- **磁贴对比图**：`adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --es export_tiles before`，等日志 `AerialTiles` 出现 `Wrote`，再 `adb pull /sdcard/Android/data/app.orchard.tv/files/tiles/before.png`。改 `TileArt` 或 `TileRecipes` 前后各导一次。别的电视上的 App 不用装：把 APK 去掉 `lib/`、`assets/`、`*.dex` 之后推到 `files/tiles/apks/`，会按「装上了」的样子画在后面（名字后带「·」）。这个目录是自己建的，用完可以整个删掉。
+- **立即预览屏保**：`adb shell am start -a app.xinghe.tv.PREVIEW_SCREENSAVER -n app.xinghe.tv/.MainActivity`；TCL 上测系统屏保：`am start -n com.android.systemui/.Somnambulator`。
+- **模拟小米的待机清理**：`adb shell am force-stop app.xinghe.tv`，然后看日志里出现 `revived by the notification listener binding`。
+- **配置**：`adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez keep_adb true`。
+- **磁贴对比图**：`adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --es export_tiles before`，等日志 `AerialTiles` 出现 `Wrote`，再 `adb pull /sdcard/Android/data/app.xinghe.tv/files/tiles/before.png`。改 `TileArt` 或 `TileRecipes` 前后各导一次。别的电视上的 App 不用装：把 APK 去掉 `lib/`、`assets/`、`*.dex` 之后推到 `files/tiles/apks/`，会按「装上了」的样子画在后面（名字后带「·」）。这个目录是自己建的，用完可以整个删掉。
 
 ## 必须遵守（踩过的坑）
 

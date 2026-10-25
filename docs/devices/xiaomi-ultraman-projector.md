@@ -16,11 +16,11 @@
 固件同样锁死 HOME：
 
 ```
-$ adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.orchard.tv
+$ adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.xinghe.tv
 cmd: Can't find service: role          # Android 9 没有 role 服务
 
-$ adb shell cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity
-java.lang.IllegalArgumentException: Component ComponentInfo{app.orchard.tv/app.orchard.tv.MainActivity} cannot be home on user 0
+$ adb shell cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity
+java.lang.IllegalArgumentException: Component ComponentInfo{app.xinghe.tv/app.xinghe.tv.MainActivity} cannot be home on user 0
 ```
 
 解决办法和小米一样：**靠 Aerial 桌面守护（无障碍）接管**，不要停用原桌面。
@@ -35,24 +35,24 @@ java.lang.IllegalArgumentException: Component ComponentInfo{app.orchard.tv/app.o
 - 装的 flavor：`standard`。`adb install -r` 直接成功，**不需要 guard 版，也不需要 TCL 的多屏互动推送**。
 - 授予的权限：`WRITE_SECURE_SETTINGS`、`ACCESS_FINE_LOCATION`，
   `appops set SYSTEM_ALERT_WINDOW allow`、`appops set WRITE_SETTINGS allow`。
-- `appops set app.orchard.tv APP_AUTO_START` / `APP_ASSOC_START` 报
+- `appops set app.xinghe.tv APP_AUTO_START` / `APP_ASSOC_START` 报
   `Error: Unknown operation string` —— 这两个是 TCL 专属 op，其它固件报错属正常，忽略。
 - 屏保：原本是 `com.android.deskclock/com.android.deskclock.Screensaver`，`screensaver_enabled=1`，
-  标准 Dream 通道可用，已改成 `app.orchard.tv/app.orchard.tv.dream.AerialDream`。
+  标准 Dream 通道可用，已改成 `app.xinghe.tv/app.xinghe.tv.dream.AerialDream`。
   （与小米相反：小米 `screensaver_enabled=0` 且不能改 AerialDream，会黑屏进待机。）
 - `KEEP_ADB=1` 生效，重启后 `settings get global adb_enabled` 仍是 `1`。
 
 ## 桌面守护与开机自启（实测）
 
-- 注入 `input keyevent KEYCODE_HOME` 后前台 = `app.orchard.tv/.MainActivity`。
+- 注入 `input keyevent KEYCODE_HOME` 后前台 = `app.xinghe.tv/.MainActivity`。
 - 从 `com.tvfengmi.launcher` 切走，约 4 秒后守护把 Aerial 拉回前台；切到别的 App 也是 4–6 秒。
-- `adb reboot` 后约 47 秒，`sys.boot_completed=1` 时前台已经是 `app.orchard.tv/.MainActivity`，
+- `adb reboot` 后约 47 秒，`sys.boot_completed=1` 时前台已经是 `app.xinghe.tv/.MainActivity`，
   中间没有经过原桌面。
 - `pm list packages -d` 为空：没有停用或卸载任何系统应用，原桌面 `com.tvfengmi.launcher` 完好。
 
 ## 通知监听绑不上（与 MFTP0 一致）
 
-`cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener` **无报错，但没生效**：
+`cmd notification allow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener` **无报错，但没生效**：
 
 ```
 $ adb shell dumpsys notification | grep RevivalListener
@@ -63,9 +63,9 @@ $ adb shell dumpsys notification | grep RevivalListener
 后果是 Aerial 被强停后没有任何东西能自动复活，只能手动：
 
 ```bash
-adb shell am force-stop app.orchard.tv
+adb shell am force-stop app.xinghe.tv
 sleep 3
-adb shell am start -W -n app.orchard.tv/.MainActivity
+adb shell am start -W -n app.xinghe.tv/.MainActivity
 ```
 
 1.21 起 Aerial 的同步适配器会兜底，约 30–60 秒后拉回（**这一条本机未验证**，见下）。

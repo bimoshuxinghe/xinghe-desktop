@@ -88,52 +88,52 @@ Run these in PowerShell, with the adb from step 1. Everything inside `adb shell 
 
 3. Grant the permissions only adb can grant. If one fails, go on with the next:
    ```
-   adb shell pm grant app.orchard.tv android.permission.ACCESS_FINE_LOCATION
-   adb shell pm grant app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-   adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW allow
-   adb shell appops set app.orchard.tv WRITE_SETTINGS allow
-   adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES allow
-   adb shell appops set app.orchard.tv GET_USAGE_STATS allow
-   adb shell appops set app.orchard.tv android:get_usage_stats allow
-   adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-   adb shell appops set app.orchard.tv APP_AUTO_START allow
-   adb shell appops set app.orchard.tv APP_ASSOC_START allow
-   adb shell cmd package compile -m speed -f app.orchard.tv
+   adb shell pm grant app.xinghe.tv android.permission.ACCESS_FINE_LOCATION
+   adb shell pm grant app.xinghe.tv android.permission.WRITE_SECURE_SETTINGS
+   adb shell appops set app.xinghe.tv SYSTEM_ALERT_WINDOW allow
+   adb shell appops set app.xinghe.tv WRITE_SETTINGS allow
+   adb shell appops set app.xinghe.tv REQUEST_INSTALL_PACKAGES allow
+   adb shell appops set app.xinghe.tv GET_USAGE_STATS allow
+   adb shell appops set app.xinghe.tv android:get_usage_stats allow
+   adb shell cmd notification allow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
+   adb shell appops set app.xinghe.tv APP_AUTO_START allow
+   adb shell appops set app.xinghe.tv APP_ASSOC_START allow
+   adb shell cmd package compile -m speed -f app.xinghe.tv
    ```
    The two `APP_*` app ops exist only on TCL; elsewhere they fail, which is fine. `compile` takes up to a minute and makes Aerial run smoothly on the TV.
 
 4. Screensaver: run `adb shell settings get secure screensaver_enabled`. If it prints `1`, also run:
    ```
-   adb shell settings put secure screensaver_components app.orchard.tv/app.orchard.tv.dream.AerialDream
-   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez own_screensaver true
+   adb shell settings put secure screensaver_components app.xinghe.tv/app.xinghe.tv.dream.AerialDream
+   adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez own_screensaver true
    ```
 
 5. Keep ADB on, if the user wants it (Xiaomi turns ADB off after standby; this makes later updates easier):
    ```
-   adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb true
+   adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez keep_adb true
    ```
 
-6. Start Aerial: `adb shell am start -W -n app.orchard.tv/.MainActivity`. The output must include `Status: ok`.
+6. Start Aerial: `adb shell am start -W -n app.xinghe.tv/.MainActivity`. The output must include `Status: ok`.
 
 7. Make it the default home screen (skip this for the guard build):
    ```
-   adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.orchard.tv
+   adb shell cmd role add-role-holder --user 0 android.app.role.HOME app.xinghe.tv
    ```
-   If that fails, use `adb shell cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity`. Xiaomi, TCL and other firmwares ignore this; Home Guard in the next item takes over there.
+   If that fails, use `adb shell cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity`. Xiaomi, TCL and other firmwares ignore this; Home Guard in the next item takes over there.
 
-   **Hisense VIDAA**: first run `adb shell getprop persist.vt.use_home_pkg`. If it prints something (e.g. `com.jamdeo.tv.vod`) other than `app.orchard.tv`, keep the old value and point it at Aerial:
+   **Hisense VIDAA**: first run `adb shell getprop persist.vt.use_home_pkg`. If it prints something (e.g. `com.jamdeo.tv.vod`) other than `app.xinghe.tv`, keep the old value and point it at Aerial:
    ```
    adb shell settings put global aerial_vt_home_pkg <old value>
-   adb shell setprop persist.vt.use_home_pkg app.orchard.tv
+   adb shell setprop persist.vt.use_home_pkg app.xinghe.tv
    ```
    If it prints nothing, skip this; other TVs don't have the property.
 
-8. Home Guard: Aerial turns it on when it starts. Run `adb shell settings get secure enabled_accessibility_services`; the result should include `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`. If it doesn't, add it, **keeping what is already there**, joined with a colon:
+8. Home Guard: Aerial turns it on when it starts. Run `adb shell settings get secure enabled_accessibility_services`; the result should include `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`. If it doesn't, add it, **keeping what is already there**, joined with a colon:
    ```powershell
-   adb shell "settings put secure enabled_accessibility_services '<previous value>:app.orchard.tv/app.orchard.tv.guard.HomeGuardService'"
+   adb shell "settings put secure enabled_accessibility_services '<previous value>:app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService'"
    adb shell settings put secure accessibility_enabled 1
    ```
-   If the previous value is `null` or empty, write `app.orchard.tv/app.orchard.tv.guard.HomeGuardService` alone. In PowerShell, write any `$` in the previous value as `` `$ ``.
+   If the previous value is `null` or empty, write `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService` alone. In PowerShell, write any `$` in the previous value as `` `$ ``.
 
    On some firmwares the `settings` command hangs and never returns (Tencent Aurora Box 6 / Q5043: cut off after 120 s). Skip this item there and check `adb shell dumpsys accessibility` for Aerial under `Enabled services` instead: once granted, Aerial turns Home Guard on itself.
 
@@ -147,7 +147,7 @@ curl.exe -fL -o Aerial.apk https://aerial.qust.me/download/aerial-guard.apk
 curl.exe -fL -o tcast-push.py https://aerial.qust.me/tools/tcast-push.py
 adb reverse tcp:8765 tcp:8765
 Start-Process python -ArgumentList '-m','http.server','8765','--bind','127.0.0.1' -WindowStyle Hidden
-python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.orchard.tv Aerial 0 180
+python tcast-push.py <IP> http://127.0.0.1:8765/Aerial.apk app.xinghe.tv Aerial 0 180
 ```
 
 After the last command, ask the user to answer the prompt in the top-right corner of the TV: **press Right, then OK, to choose 同意 (Agree)**. Once the script reports the app installed, stop the `python -m http.server` process, run `adb reverse --remove tcp:8765`, and continue from Windows item 3.
@@ -159,19 +159,19 @@ If the TV has no 多屏互动: `adb push Aerial.apk /sdcard/Download/Aerial.apk`
 Run each of these and paste the **raw output** to the user:
 
 ```
-adb shell "dumpsys package app.orchard.tv | grep versionName"
+adb shell "dumpsys package app.xinghe.tv | grep versionName"
 adb shell "cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME"
 adb shell settings get secure enabled_accessibility_services
-adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.orchard.tv)'"
+adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.xinghe.tv)'"
 adb shell input keyevent KEYCODE_HOME
 adb shell "sleep 3; dumpsys window | grep mCurrentFocus"
 ```
 
 - Line 1 shows a `versionName`: installed.
-- Line 2 is the home screen the system resolves to. It is fine for Xiaomi to still name PatchWall (`com.mitv.tvhome`) or TCL its own launcher; Home Guard takes over. `app.orchard.tv` is better still.
-- Line 3 includes `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`: Home Guard is on. (On stock Android TV, where Aerial is already the default home screen, it may not be; line 6 decides.)
+- Line 2 is the home screen the system resolves to. It is fine for Xiaomi to still name PatchWall (`com.mitv.tvhome`) or TCL its own launcher; Home Guard takes over. `app.xinghe.tv` is better still.
+- Line 3 includes `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`: Home Guard is on. (On stock Android TV, where Aerial is already the default home screen, it may not be; line 6 decides.)
 - Line 4 is above 0: Home Guard is running.
-- **Line 6 includes `app.orchard.tv`: Home leads to Aerial and the install worked.** Don't tell the user it's installed until it does.
+- **Line 6 includes `app.xinghe.tv`: Home leads to Aerial and the install worked.** Don't tell the user it's installed until it does.
 - Paste the raw output of lines 2, 3 and 6 to the user, not just "success". If line 2 errors on an old system without `cmd`, run `adb shell pm resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME` instead.
 
 If line 6 shows something else, wait 5 seconds and run lines 5 and 6 again (Home Guard starts slowly on some TVs). If it still does, see "Common cases".
@@ -193,23 +193,23 @@ Add `--uninstall` (`bash -s restore --uninstall`) to remove Aerial as well.
 Windows, one command at a time:
 
 ```
-adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez keep_adb false --ez own_screensaver false
-adb shell cmd notification disallow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
-adb shell pm revoke app.orchard.tv android.permission.WRITE_SECURE_SETTINGS
-adb shell appops set app.orchard.tv SYSTEM_ALERT_WINDOW default
-adb shell appops set app.orchard.tv REQUEST_INSTALL_PACKAGES default
-adb shell appops set app.orchard.tv APP_AUTO_START default
-adb shell appops set app.orchard.tv APP_ASSOC_START default
-adb shell am force-stop app.orchard.tv
-adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.orchard.tv
+adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez keep_adb false --ez own_screensaver false
+adb shell cmd notification disallow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
+adb shell pm revoke app.xinghe.tv android.permission.WRITE_SECURE_SETTINGS
+adb shell appops set app.xinghe.tv SYSTEM_ALERT_WINDOW default
+adb shell appops set app.xinghe.tv REQUEST_INSTALL_PACKAGES default
+adb shell appops set app.xinghe.tv APP_AUTO_START default
+adb shell appops set app.xinghe.tv APP_ASSOC_START default
+adb shell am force-stop app.xinghe.tv
+adb shell cmd role remove-role-holder --user 0 android.app.role.HOME app.xinghe.tv
 ```
 
 Then:
 
-- If `adb shell settings get secure screensaver_components` is `app.orchard.tv/...`, put back the default: `adb shell settings put secure screensaver_components <value of adb shell settings get secure screensaver_default_component>`.
-- `adb shell settings get secure enabled_accessibility_services`: remove `app.orchard.tv/app.orchard.tv.guard.HomeGuardService` (and the colon next to it) and write the rest back unchanged. If nothing else is left, run `adb shell settings delete secure enabled_accessibility_services`.
-- Hisense VIDAA: if `adb shell settings get global aerial_vt_home_pkg` prints a value (not `null`), run `adb shell setprop persist.vt.use_home_pkg <that value>` and `adb shell settings delete global aerial_vt_home_pkg`. If it prints nothing but `adb shell getprop persist.vt.use_home_pkg` is `app.orchard.tv` (set by hand on 1.15 and earlier) and `com.jamdeo.tv.vod` is installed, run `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`.
-- To uninstall: `adb uninstall app.orchard.tv`.
+- If `adb shell settings get secure screensaver_components` is `app.xinghe.tv/...`, put back the default: `adb shell settings put secure screensaver_components <value of adb shell settings get secure screensaver_default_component>`.
+- `adb shell settings get secure enabled_accessibility_services`: remove `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService` (and the colon next to it) and write the rest back unchanged. If nothing else is left, run `adb shell settings delete secure enabled_accessibility_services`.
+- Hisense VIDAA: if `adb shell settings get global aerial_vt_home_pkg` prints a value (not `null`), run `adb shell setprop persist.vt.use_home_pkg <that value>` and `adb shell settings delete global aerial_vt_home_pkg`. If it prints nothing but `adb shell getprop persist.vt.use_home_pkg` is `app.xinghe.tv` (set by hand on 1.15 and earlier) and `com.jamdeo.tv.vod` is installed, run `adb shell setprop persist.vt.use_home_pkg com.jamdeo.tv.vod`.
+- To uninstall: `adb uninstall app.xinghe.tv`.
 - Finally `adb shell input keyevent KEYCODE_HOME`; the TV goes back to its own home screen.
 
 ## Common cases
@@ -221,10 +221,10 @@ Then:
 - **TVs with only Wireless debugging** (FFALCON 55S595C Ultra, MT9655): adb can't be authorized there, so Aerial installs but can't take over Home.
 - **Hisense VIDAA**: once item 7 has changed `persist.vt.use_home_pkg`, Home goes straight to Aerial; the TV still starts into its own launcher after a reboot (the firmware holds third-party apps back until boot completes), so press Home once.
 - **Other Vidda systems, OPPO K9, FFALCON Crane 6**: Aerial installs but the TV doesn't start into it (the firmware only accepts its own launcher unless that is removed, which this install doesn't do). Aerial still works as an app.
-- **Check line 4 is 0 but line 3 lists Aerial**: common right after an update, when the system still looks in the old install directory (Xiaomi, Android 9, #72). Run `adb shell am force-stop app.orchard.tv`, wait 3 seconds, run `adb shell am start -W -n app.orchard.tv/.MainActivity`, and check again. On macOS / Linux, `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair` does the same.
+- **Check line 4 is 0 but line 3 lists Aerial**: common right after an update, when the system still looks in the old install directory (Xiaomi, Android 9, #72). Run `adb shell am force-stop app.xinghe.tv`, wait 3 seconds, run `adb shell am start -W -n app.xinghe.tv/.MainActivity`, and check again. On macOS / Linux, `curl -fsSL https://aerial.qust.me/install.sh | TV=<IP> bash -s repair` does the same.
 - **Home opens the TV's own launcher again after a while**: try the same stop-and-open first.
-- **Check line 4 is 0 and line 3 does not list Aerial**: some firmwares block sideloaded accessibility services. Ask the user to allow Aerial's autostart and accessibility in the TV's security or permissions app, then run `adb shell am start -n app.orchard.tv/.MainActivity` and check again.
-- **Forgot the parental PIN**: `adb shell am broadcast -a app.orchard.tv.CONFIG -n app.orchard.tv/.guard.ConfigReceiver --ez clear_pin true` turns it off.
+- **Check line 4 is 0 and line 3 does not list Aerial**: some firmwares block sideloaded accessibility services. Ask the user to allow Aerial's autostart and accessibility in the TV's security or permissions app, then run `adb shell am start -n app.xinghe.tv/.MainActivity` and check again.
+- **Forgot the parental PIN**: `adb shell am broadcast -a app.xinghe.tv.CONFIG -n app.xinghe.tv/.guard.ConfigReceiver --ez clear_pin true` turns it off.
 - **Not supported**: LG webOS, Samsung Tizen, Huawei Vision (HarmonyOS), and Android 4.4 or older (Aerial needs Android 5.0). TVs that cannot open ADB, such as XGIMI H3, old LeTV sets, Honor Vision and old Konka models (no version number to tap), can't be used yet.
 
 ## What users ask

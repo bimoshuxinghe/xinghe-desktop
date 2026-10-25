@@ -7,7 +7,7 @@ Amlogic 平台、Android 6.0.x 的一批小米电视和盒子，问题基本相�
 - PatchWall（`com.mitv.tvhome`，uid 1000）到前台时**不发**无障碍窗口事件，窗口内容也读不到；别的 App 的事件正常（#81 一位用户逐条打印确认）。主页键被 `MitvPhoneWindowManager` 先处理，按键过滤收不到（部分固件）。
 - 开机约 20 秒后 PatchWall 的 `BootActivity` 盖住 Aerial，关掉后露出主页，没有新事件（#209 #318）。
 - 开机那次绑定有时 `queryIntentActivities(HOME)` 拿不到 PatchWall（#318）。
-- 1.43：守护在 Android 6 及以下每秒读一次用量统计（`UsageStatsManager.queryEvents` 最近 10 秒里最新的 `MOVE_TO_FOREGROUND`），前台是原桌面的主页 Activity 就拉回 Aerial，同一个事件只拉一次。要 `appops set app.orchard.tv GET_USAGE_STATS allow`（只能 adb 给）。用户在 ANSM0 上用本地补丁验证过开机和主页键都能接管，按主页键后要 5–8 秒才回到 Aerial（这台启动慢）。
+- 1.43：守护在 Android 6 及以下每秒读一次用量统计（`UsageStatsManager.queryEvents` 最近 10 秒里最新的 `MOVE_TO_FOREGROUND`），前台是原桌面的主页 Activity 就拉回 Aerial，同一个事件只拉一次。要 `appops set app.xinghe.tv GET_USAGE_STATS allow`（只能 adb 给）。用户在 ANSM0 上用本地补丁验证过开机和主页键都能接管，按主页键后要 5–8 秒才回到 Aerial（这台启动慢）。
 - 手动恢复（老版本）：`settings put secure accessibility_enabled 0`，等 2 秒，再 `1`；或 `am force-stop` 后重开 Aerial。
 
 ## HDMI 编号（小米播放器 `ExternalSourceActivity --ei input N`）

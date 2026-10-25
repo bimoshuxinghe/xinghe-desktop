@@ -116,7 +116,7 @@
             android:exported="true"
             android:permission="android.permission.WRITE_SECURE_SETTINGS">
             <intent-filter>
-                <action android:name="app.orchard.tv.CONFIG" />
+                <action android:name="app.xinghe.tv.CONFIG" />
             </intent-filter>
         </receiver>
 

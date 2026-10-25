@@ -24,7 +24,7 @@
 
 ## 开机自启
 
-- 2026-10-20 实测 `adb reboot`：约 25 秒后网络 ADB 恢复，`sys.boot_completed=1` 时前台已经是 `app.orchard.tv/.MainActivity`，没有再落到 PatchWall。
+- 2026-10-20 实测 `adb reboot`：约 25 秒后网络 ADB 恢复，`sys.boot_completed=1` 时前台已经是 `app.xinghe.tv/.MainActivity`，没有再落到 PatchWall。
 - 开机后 `settings get global adb_enabled` 仍是 `1`（装了 `KEEP_ADB=1`）。
 - 未停用任何系统应用，`pm list packages -d` 为空。
 
@@ -74,5 +74,5 @@ Home Guard is running. Press Home on the remote.
 2026-10-22 在第二台 finch 上重跑同一条命令，型号字符串、`ro.product.device` 都是 `MiTV-MFFU0` / `finch`，固件是 `OS3.0.115.0.UFFMATV`（不是上面的 OS4.0.11）：
 
 - 一次装成功，`install.sh` 的结尾输出和上面一致，装的版本是 1.31。
-- 验收 5 条全部通过：`versionName=1.31`、`enabled_accessibility_services` 里有 `HomeGuardService`、`dumpsys accessibility` 计数为 1、按 HOME 后前台是 `app.orchard.tv/.MainActivity`。
+- 验收 5 条全部通过：`versionName=1.31`、`enabled_accessibility_services` 里有 `HomeGuardService`、`dumpsys accessibility` 计数为 1、按 HOME 后前台是 `app.xinghe.tv/.MainActivity`。
 - 重启后开机直接进入 Aerial，实机确认正常（这次没有留 adb 采样输出）。

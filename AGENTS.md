@@ -17,7 +17,7 @@ source local/tvs.env && BUILD=1 KEEP_ADB=1 TV=$XIAOMI_TV tools/install.sh   # BU
 ```
 
 - 连电视的命令（adb、curl 访问电视）需要关闭沙箱。
-- 在电视上测试一律用 release 版并执行 `cmd package compile -m speed -f app.orchard.tv`，debug 版在电视上会卡。
+- 在电视上测试一律用 release 版并执行 `cmd package compile -m speed -f app.xinghe.tv`，debug 版在电视上会卡。
 - 发 TCL 版本前先给 `versionCode` 加 1。
 
 ## 代码约定

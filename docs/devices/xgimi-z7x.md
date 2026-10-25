@@ -22,9 +22,9 @@ App 里的「开机自动恢复」默认关闭，**关着的话重启后 5555 �
 
 - 安装的 flavor：`standard`。
 - `adb install -r aerial-standard.apk` → `Success`。这台固件不拦 adb 安装，没有 `VERIFICATION_FAILURE` 之类的问题。
-- `cmd package set-home-activity --user 0 app.orchard.tv/.MainActivity` → `Success`。
-- 无障碍：原值 `com.xgimi.duertts/com.xgimi.duertts.MonitorService`，追加为 `...:app.orchard.tv/app.orchard.tv.guard.HomeGuardService`，可正常生效。
-- 屏保：`screensaver_enabled=1` 时接管为 `app.orchard.tv/app.orchard.tv.dream.AerialDream`。
+- `cmd package set-home-activity --user 0 app.xinghe.tv/.MainActivity` → `Success`。
+- 无障碍：原值 `com.xgimi.duertts/com.xgimi.duertts.MonitorService`，追加为 `...:app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`，可正常生效。
+- 屏保：`screensaver_enabled=1` 时接管为 `app.xinghe.tv/app.xinghe.tv.dream.AerialDream`。
 
 ## 开机行为
 

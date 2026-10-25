@@ -54,7 +54,7 @@ HTTP 服务日志里完全没有来自电视的请求（本机 macOS 防火墙�
 - **关于本机** = 电视名称、本机信息、网络信息、软件更新
 
 `223>>GET` 解出只有 **12 个可启动应用**：云视听小电视、天气预报、应用商店、多屏互动、影视仓、用户中心、
-机顶盒设置、`com.tcl.settings`（设置）、`app.orchard.tv`（Aerial）、VidHub、媒体中心、网易云音乐。
+机顶盒设置、`com.tcl.settings`（设置）、`app.xinghe.tv`（Aerial）、VidHub、媒体中心、网易云音乐。
 
 ⚠ **每次新建 TCP 连接都会让 TCL 侧边设置面板自动关闭**（相当于「手机已连接」提示抢焦点）。
 所以「打开设置 → 按键导航 → 截图确认」必须**在同一个连接里一口气跑完**，否则按键会全部落到桌面上。
@@ -65,7 +65,7 @@ HTTP 服务日志里完全没有来自电视的请求（本机 macOS 防火墙�
 
 | 指令 | 作用 | 本机实测 |
 |---|---|---|
-| `263>><1 activity / 2 broadcast>><intentJSON>` | 发任意 Intent（等于远程 `am start`），可指定 `component{pkg,cls}` | ✅ 拉起 `app.orchard.tv/.MainActivity` 成功 |
+| `263>><1 activity / 2 broadcast>><intentJSON>` | 发任意 Intent（等于远程 `am start`），可指定 `component{pkg,cls}` | ✅ 拉起 `app.xinghe.tv/.MainActivity` 成功 |
 | `225>>` | 电视截图，回包带图片 URL | ✅ 可拿到 89 KB PNG（**视频层截不到，字幕/时钟可见**） |
 | `149>><keyCode>` | 模拟遥控按键（up=11/down=12/left=13/right=14/ok=15/back=16/menu=18/home=19） | ✅ 可用于盲导航 |
 | `223>>GET` | 应用列表 | ✅ 解出 12 个应用 |

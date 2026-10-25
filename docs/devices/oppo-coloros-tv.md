@@ -40,7 +40,7 @@ INSTALL_FAILED_DUPLICATE_PERMISSION: App installation is banned, because of laun
    原因是应用内部会用一个「包名 + 固定后缀」的权限名注册广播，这个权限名是打包时按
    `applicationId` 写死的，改了包名就对不上。manifest 里的声明要一起改成新包名。
 2. **官方版、`guard` 版会装不进来**，报错
-   `INSTALL_FAILED_CONFLICTING_PROVIDER … app.orchard.tv.androidx-startup is already used by …`。
+   `INSTALL_FAILED_CONFLICTING_PROVIDER … app.xinghe.tv.androidx-startup is already used by …`。
    这个内部组件名同样写死了原包名，改了包名后它和官方包撞车，也要改成新包名。
 
 ## 还差一步：告诉开机流程「这是要启动的桌面」
@@ -73,5 +73,5 @@ OPPO 开机时只认带 `com.heytap.tv.launcher.category.MODERN_HOME` 这个标�
   执行 `adb shell am force-stop com.oneplus.tv.launcher2`，
   通知监听会把 Aerial 重新拉起来，守护也会跟着重新连上。
 - 装第二个「桌面」应用会清掉默认桌面的选择，装完之后要把默认桌面重新指回 Aerial：
-  `adb shell cmd package set-home-activity com.oneplus.tv.launcher2/app.orchard.tv.MainActivity`。
+  `adb shell cmd package set-home-activity com.oneplus.tv.launcher2/app.xinghe.tv.MainActivity`。
   这台机器的设置里也有「设置主屏幕」一项，可以当开关用。

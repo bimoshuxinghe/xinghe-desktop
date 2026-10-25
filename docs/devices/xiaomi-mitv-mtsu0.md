@@ -23,15 +23,15 @@ HOME 锁定、屏保、待机唤醒的结论和 MFFU0 一致，见 [xiaomi-mitv-
 
 - `cmd role add-role-holder` / `cmd package set-home-activity` 都不报错，但 `resolve-activity` 仍然返回 `com.mitv.tvhome/.MainActivityUserMode`，和 finch 一样。
 - `install.sh` 因此转用桌面守护，输出 `The firmware still sends Home to com.mitv.tvhome/.MainActivityUserMode; turning on Aerial Home Guard.`。
-- 装完后 `enabled_accessibility_services` 里只有 `app.orchard.tv/app.orchard.tv.guard.HomeGuardService`。这台的小爱（`com.xiaomi.voicecontrol`）虽然装着，但它的无障碍服务本来就没启用，安装过程没有替它打开；`accessibility_enabled` 为 `1`。
+- 装完后 `enabled_accessibility_services` 里只有 `app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService`。这台的小爱（`com.xiaomi.voicecontrol`）虽然装着，但它的无障碍服务本来就没启用，安装过程没有替它打开；`accessibility_enabled` 为 `1`。
 
 ## 开机自启
 
 - 2026-10-22 实测 `adb reboot`：22:28:08 发出重启，22:29:43 第一次采到 `sys.boot_completed=1`（脚本先固定等了 95 秒，更早的时间点没有采样）。
-- **开机后没有按任何键**，连续 5 次采样（间隔 4 秒）前台都是 `app.orchard.tv/app.orchard.tv.MainActivity`，没有落到 PatchWall：
+- **开机后没有按任何键**，连续 5 次采样（间隔 4 秒）前台都是 `app.xinghe.tv/app.xinghe.tv.MainActivity`，没有落到 PatchWall：
 
   ```text
-  mCurrentFocus=Window{c34488a u0 app.orchard.tv/app.orchard.tv.MainActivity}
+  mCurrentFocus=Window{c34488a u0 app.xinghe.tv/app.xinghe.tv.MainActivity}
   ```
 
 - 开机后 `settings get global adb_enabled` 仍是 `1`（装了 `KEEP_ADB=1`）。
@@ -71,10 +71,10 @@ Home Guard is running. Press Home on the remote.
 验收（重启后复测，`versionName=1.31`）：
 
 ```text
-$ adb shell "dumpsys package app.orchard.tv | grep versionName"
+$ adb shell "dumpsys package app.xinghe.tv | grep versionName"
     versionName=1.31
 $ adb shell settings get secure enabled_accessibility_services
-app.orchard.tv/app.orchard.tv.guard.HomeGuardService
-$ adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.orchard.tv)'"
+app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService
+$ adb shell "dumpsys accessibility | grep -c -E 'label=(Aerial|app.xinghe.tv)'"
 1
 ```

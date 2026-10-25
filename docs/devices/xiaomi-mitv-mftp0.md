@@ -17,24 +17,24 @@
 升级到 1.16 后 logcat 里立刻出现：
 
 ```text
-W ziparchive: Unable to open '/data/app/app.orchard.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk': No such file or directory
-E system_server: Failed to open APK '/data/app/app.orchard.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk' I/O error
-E ResourcesManager: failed to add asset path /data/app/app.orchard.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk
-W PackageManager: Failure retrieving resources for app.orchard.tv
+W ziparchive: Unable to open '/data/app/app.xinghe.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk': No such file or directory
+E system_server: Failed to open APK '/data/app/app.xinghe.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk' I/O error
+E ResourcesManager: failed to add asset path /data/app/app.xinghe.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk
+W PackageManager: Failure retrieving resources for app.xinghe.tv
 ```
 
 对照实际路径：
 
 ```text
-错误里的路径 : /data/app/app.orchard.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk   ← 已被删除
-真实的 codePath: /data/app/app.orchard.tv-3cMB0fugJLqv9l5cVlhkpA==/base.apk   ← 升级后的新目录
+错误里的路径 : /data/app/app.xinghe.tv-EQ7BsdEf0tfGxmIzz_rO1g==/base.apk   ← 已被删除
+真实的 codePath: /data/app/app.xinghe.tv-3cMB0fugJLqv9l5cVlhkpA==/base.apk   ← 升级后的新目录
 ```
 
 **怎么认出这个状态**：设置里有、`dumpsys` 里没有。
 
 ```text
 $ adb shell settings get secure enabled_accessibility_services
-...:app.orchard.tv/app.orchard.tv.guard.HomeGuardService        ← 设置里在
+...:app.xinghe.tv/app.xinghe.tv.guard.HomeGuardService        ← 设置里在
 
 $ adb shell dumpsys accessibility | grep -iE "label=Aerial"
 （空）                                                           ← 系统里没有
@@ -45,9 +45,9 @@ $ adb shell dumpsys accessibility | grep -iE "label=Aerial"
 ### 恢复方式（已验证有效，不需要重装）
 
 ```bash
-adb shell am force-stop app.orchard.tv
+adb shell am force-stop app.xinghe.tv
 sleep 3
-adb shell am start -W -n app.orchard.tv/.MainActivity
+adb shell am start -W -n app.xinghe.tv/.MainActivity
 ```
 
 执行后守护立刻绑定，前台回到 Aerial。`force-stop` 让系统重新走一遍资源加载，路径就对了。也不需要重启电视。
@@ -57,7 +57,7 @@ adb shell am start -W -n app.orchard.tv/.MainActivity
 `RevivalListener`（被杀后拉回来的机制）**在这台上无法绑定**，所以一旦守护失效，没有任何东西能自动恢复。1.16 上复测仍然如此。
 
 ```text
-$ adb shell cmd notification allow_listener app.orchard.tv/app.orchard.tv.guard.RevivalListener
+$ adb shell cmd notification allow_listener app.xinghe.tv/app.xinghe.tv.guard.RevivalListener
 EXIT=0                                            # ← 报告成功
 
 $ adb shell dumpsys notification | grep -A4 "Notification listeners:"
@@ -75,9 +75,9 @@ $ adb shell dumpsys notification | grep -A4 "Notification listeners:"
 | `cmd notification allow_listener <COMPONENT> 0`（positional user_id） | `EXIT=0`，不写入 |
 | `cmd notification allow_listener --user 0 <COMPONENT>` | `Invalid listener - must be a ComponentName`，`EXIT=255`（Android 9 不认这个写法） |
 | `settings put secure enabled_notification_listeners <COMPONENT>` | **能写入并读回**，但 `NotificationManagerService` 从不加载它，`dumpsys` 里始终 0 绑定 |
-| `appops set app.orchard.tv NOTIFICATION_LISTENER allow` | `Unknown operation string`（Android 9 没有这个 op） |
-| `appops set app.orchard.tv BIND_NOTIFICATION_LISTENER_SERVICE allow` | `Unknown operation string` |
-| `appops set app.orchard.tv ACCESS_NOTIFICATIONS allow` | `EXIT=0`，但对绑定无帮助 |
+| `appops set app.xinghe.tv NOTIFICATION_LISTENER allow` | `Unknown operation string`（Android 9 没有这个 op） |
+| `appops set app.xinghe.tv BIND_NOTIFICATION_LISTENER_SERVICE allow` | `Unknown operation string` |
+| `appops set app.xinghe.tv ACCESS_NOTIFICATIONS allow` | `EXIT=0`，但对绑定无帮助 |
 
 **电视上没有手动开启的入口**：`android.settings.NOTIFICATION_LISTENER_SETTINGS` 解析不到任何 Activity，用户没法在设置里自己打开。
 
@@ -89,7 +89,7 @@ $ adb shell dumpsys notification | grep -A4 "Notification listeners:"
 
 改用 Android 的同步框架拉起 Aerial（`guard/RevivalSync.kt`）：
 
-- Aerial 自己建一个账号（类型 `app.orchard.tv`，设置 → 账号里能看到「Aerial 桌面守护」），在 `settings` 这个 authority 上注册同步适配器，`supportsUploading=true`。
+- Aerial 自己建一个账号（类型 `app.xinghe.tv`，设置 → 账号里能看到「Aerial 桌面守护」），在 `settings` 这个 authority 上注册同步适配器，`supportsUploading=true`。
 - `SettingsProvider` 每次写设置都 `notifyChange(uri, null, syncToNetwork=true)`，`ContentService` 因此对 `settings` 安排一次本地同步，延迟 `sync.local_sync_delay`（默认 30 秒）。
 - 强停本身就会触发它：`AccessibilityManagerService.onHandleForceStop` 把 Aerial 从 `enabled_accessibility_services` 里删掉，这就是一次设置写入。小米唤醒时把 `adb_enabled` 改成 0 也是。
 - 同步任务的 JobScheduler 任务属于系统 uid，`cancelJobsForPackageAndUid` 只取消 Aerial 自己 uid 的任务，所以强停不会把它取消；`SyncManager` 绑定适配器服务时，系统会为已强停的包启动进程。
@@ -100,7 +100,7 @@ $ adb shell dumpsys notification | grep -A4 "Notification listeners:"
 
 | 环境 | 结果 |
 | --- | --- |
-| Android 9 模拟器（`system-images;android-28;default;arm64-v8a`，`setprop ro.config.low_ram true` 后重启框架，`meminfo` 显示 `low-ram`） | `allow_listener` 静默失败，复现了这台的现象。原生桌面在前台时 `am force-stop`：进程一直不在，49 秒后 `Start proc … for service app.orchard.tv/.guard.RevivalSyncService`，守护写回并接管桌面 |
+| Android 9 模拟器（`system-images;android-28;default;arm64-v8a`，`setprop ro.config.low_ram true` 后重启框架，`meminfo` 显示 `low-ram`） | `allow_listener` 静默失败，复现了这台的现象。原生桌面在前台时 `am force-stop`：进程一直不在，49 秒后 `Start proc … for service app.xinghe.tv/.guard.RevivalSyncService`，守护写回并接管桌面 |
 | 同上，熄屏 → 强停 → 待机 60 秒 → 唤醒，连做 3 轮 | 每轮强停后约 30 秒复活，唤醒后 2 秒前台是 Aerial |
 | 同上，只待机 15 秒，做 2 轮 | 唤醒后 22–25 秒才回到 Aerial（等同步的 30 秒延迟） |
 | 小米 MFTR0（Android 14，固件同样有 `MitvActivityManagerService`），临时 `disallow_listener` 后 `am force-stop` | 46 秒后 `Start proc … for service RevivalSyncService`，**小米固件放行了同步框架拉起已强停的应用**。测完已 `allow_listener` 恢复 |
@@ -130,7 +130,7 @@ $ adb shell dumpsys notification | grep -A4 "Notification listeners:"
 ## 开机自启
 
 - `BootReceiver` + `RECEIVE_BOOT_COMPLETED: granted=true` 都在，**冷启动自启正常**。
-- 2026-10-21 实测 `adb reboot`：约 33 秒后 `sys.boot_completed=1`，此时前台已经是 `app.orchard.tv/.MainActivity`，没有落到 PatchWall。
+- 2026-10-21 实测 `adb reboot`：约 33 秒后 `sys.boot_completed=1`，此时前台已经是 `app.xinghe.tv/.MainActivity`，没有落到 PatchWall。
 - 开机后 `settings get global adb_enabled` 仍是 `1`（装了 `KEEP_ADB=1`）。
 - 未停用任何系统应用。
 
@@ -159,7 +159,7 @@ adb shell input keyevent KEYCODE_POWER   # 唤醒
 
 ## 屏保
 
-- `screensaver_components` 写成 `app.orchard.tv/app.orchard.tv.dream.AerialDream` 有效，重启后仍然保持。
+- `screensaver_components` 写成 `app.xinghe.tv/app.xinghe.tv.dream.AerialDream` 有效，重启后仍然保持。
 - 小米不用 Android 标准 Dream（同 MFTR0），注意不要依赖 `screensaver_enabled`。
 
 ## 其他
