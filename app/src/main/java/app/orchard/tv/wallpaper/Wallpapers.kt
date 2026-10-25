@@ -369,7 +369,7 @@ object Wallpapers {
      * It was [atMs] into [film], where the film picks up when it next moves ([liveSpot]).
      */
     suspend fun useLiveFrame(frame: Bitmap, film: String, atMs: Long) {
-        if (selectedId != LIVE) return
+        if (selectedId != LIVE && selectedId != VIDEO) return
         backdropJob?.cancel()
         prefs.edit { putString("live_film", film).putLong("live_at", atMs) }
         val (bmp, frost) = withContext(Dispatchers.Default) {
@@ -379,10 +379,10 @@ object Wallpapers {
             val frost = Images.frost(frame)
             Images.shadeForHome(frame) to frost
         }
-        synchronized(thumbs) { thumbs.remove(LIVE) }
+        synchronized(thumbs) { thumbs.remove(LIVE); thumbs.remove(VIDEO) }
         backdrop = bmp.asImageBitmap()
         frosted = frost.asImageBitmap()
-        resolve(LIVE)?.let { saveBaked(bakedKey(it), bmp, frost) }
+        resolve(selectedId)?.let { saveBaked(bakedKey(it), bmp, frost) }
     }
 
     /**
@@ -400,14 +400,14 @@ object Wallpapers {
      * [useLiveFrame]. [frame] is used up.
      */
     suspend fun useLiveFrost(frame: Bitmap) {
-        if (selectedId != LIVE) return
+        if (selectedId != LIVE && selectedId != VIDEO) return
         backdropJob?.cancel()
         frosted = withContext(Dispatchers.Default) { Images.frost(frame) }.asImageBitmap()
     }
 
     /** Puts back the glass from before [useLiveFrost] when the exact frame could not be had. */
     fun restoreFrost(before: ImageBitmap?) {
-        if (selectedId == LIVE && before != null) frosted = before
+        if ((selectedId == LIVE || selectedId == VIDEO) && before != null) frosted = before
     }
 
     private fun rebuildList() {

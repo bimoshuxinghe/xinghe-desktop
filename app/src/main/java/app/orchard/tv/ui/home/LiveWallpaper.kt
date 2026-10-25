@@ -133,6 +133,9 @@ fun LiveWallpaper(
     LaunchedEffect(lastInputAt, moving) {
         idle = false
         if (!moving) return@LaunchedEffect
+        // The video wallpaper moves as soon as Home shows it: no still wait, and keys do not stop
+        // it — only leaving the top row, an overlay, an app or the screensaver does.
+        if (Wallpapers.selectedId == Wallpapers.VIDEO) { idle = true; return@LaunchedEffect }
         delay(START_AFTER_MS)
         idle = true
     }
@@ -153,6 +156,7 @@ fun LiveWallpaper(
     /** The owner's uploaded videos (ScreensaverVideos), local files, looping muted behind Home. */
     fun openLocal(): ExoPlayer {
         val videos = ScreensaverVideos.all(context)
+        DiagLog.i("video wallpaper: ${videos.size} video(s) on hand")
         // Where the picture on screen came from one of them, pick up there; else the first in line.
         val spot = Wallpapers.liveSpot()
         val resume = spot?.let { (id, _) -> videos.firstOrNull { "local:${it.id}" == id } }
@@ -180,13 +184,15 @@ fun LiveWallpaper(
                     prepare()
                 }
             })
-            setMediaItems(
-                films.map { MediaItem.Builder().setUri(Uri.fromFile(it.file)).setMediaId("local:${it.id}").build() },
-                0,
-                if (resume != null) spot?.second ?: 0L else 0L,
-            )
-            surface?.let { setVideoSurfaceView(it) }
-            prepare()
+            if (films.isNotEmpty()) {
+                setMediaItems(
+                    films.map { MediaItem.Builder().setUri(Uri.fromFile(it.file)).setMediaId("local:${it.id}").build() },
+                    0,
+                    if (resume != null) spot?.second ?: 0L else 0L,
+                )
+                surface?.let { setVideoSurfaceView(it) }
+                prepare()
+            }
             live.player = this
         }
     }
