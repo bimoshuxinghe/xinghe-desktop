@@ -30,9 +30,15 @@ object ScreensaverVideos {
             }.getOrNull()
         }.sortedBy { it.id }
 
-    /** The upload is already on disk and is taken over. Validate it first, and publish a complete directory. */
+    /**
+     * The upload is already on disk and is taken over. Validate it first, and publish a complete
+     * directory. [thumb] is the film's first frame as the phone's browser made it while the file
+     * was in its hands: the one picture of the film this TV can always show, where no decoder
+     * will (the cards were blank, then the wallpaper itself froze, where a second decoder was
+     * opened to try — these TVs have one, and the wallpaper's player holds it).
+     */
     @Synchronized
-    fun add(context: Context, upload: File, name: String): ScreensaverVideo? {
+    fun add(context: Context, upload: File, name: String, thumb: File? = null): ScreensaverVideo? {
         val root = directory(context)
         // Only abandoned imports, never a film that has been published or one being copied now.
         root.listFiles()?.filter { it.name.startsWith("import-") && it.lastModified() < System.currentTimeMillis() - 3_600_000 }
@@ -61,6 +67,9 @@ object ScreensaverVideos {
             val film = File(staging, "video.mp4")
             if (!upload.renameTo(film)) upload.copyTo(film)
             File(staging, "info.json").writeText(JSONObject().put("name", title).toString())
+            if (thumb != null && thumb.isFile && thumb.length() in 1..(2L * 1024 * 1024)) {
+                thumb.inputStream().use { input -> File(staging, "thumb.jpg").outputStream().use { input.copyTo(it) } }
+            }
             check(staging.renameTo(target))
             ScreensaverVideo(id, title, File(target, "video.mp4"))
         } catch (e: Exception) {

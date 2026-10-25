@@ -40,6 +40,23 @@ object Images {
     }
 
     /**
+     * Whether a picture carries no picture at all: near-black through, as a stopped frame read off
+     * a video plane comes back on the TVs where apps cannot read that plane (issue #256). A dark
+     * night scene still clears it by a wide margin, so it stands in for black only.
+     */
+    fun blank(b: Bitmap): Boolean {
+        if (b.width <= 0 || b.height <= 0) return true
+        val s = 8
+        val small = Bitmap.createScaledBitmap(b, s, s, true)
+        val px = IntArray(s * s)
+        small.getPixels(px, 0, s, 0, 0, s, s)
+        if (small !== b) small.recycle()
+        var sum = 0L
+        for (p in px) sum += (p shr 16 and 0xFF) + (p shr 8 and 0xFF) + (p and 0xFF)
+        return sum < s.toLong() * s * 12
+    }
+
+    /**
      * Shading baked into a home backdrop so the clock and the top row read over any picture, the way
      * tvOS darkens the area under its app rows. Baked once, so the TV draws a single full-screen layer.
      * Light since 1.28: the grid has its own darkened frosted background and the top row its plate,

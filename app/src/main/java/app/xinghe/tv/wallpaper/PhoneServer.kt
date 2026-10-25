@@ -325,7 +325,10 @@ class PhoneServer private constructor(private val context: Context, private val 
         session.parseBody(files)
         val path = files["video"] ?: return text(Response.Status.BAD_REQUEST, "no video")
         val name = session.parameters["video"]?.firstOrNull().orEmpty()
-        val saved = ScreensaverVideos.add(context, File(path), name) != null
+        // The frame the phone's browser made of the film rides along with it: that browser decodes
+        // what the TV's retriever will not, and the TV opens no second decoder to try.
+        val thumb = files["thumb"]?.let(::File)?.takeIf { it.exists() && it.length() > 0 }
+        val saved = ScreensaverVideos.add(context, File(path), name, thumb) != null
         Wallpapers.refreshVideos()
         return json(state().put("saved", saved))
     }

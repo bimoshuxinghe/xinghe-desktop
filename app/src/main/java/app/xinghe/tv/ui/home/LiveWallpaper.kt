@@ -184,8 +184,17 @@ fun LiveWallpaper(
 
                 override fun onPlayerError(error: PlaybackException) {
                     DiagLog.i("video wallpaper failed (${error.errorCodeName})")
-                    // Three in a row: the file is unreadable; the picture stays as it is.
-                    if (++failures >= 3) return
+                    // Three quick tries, then one every few seconds — never a give-up: the decoder
+                    // can be held for a while by whoever needs it (a screensaver, a first frame
+                    // asked for somewhere else), and the film is to come back on its own once the
+                    // way is free, without a key press having to wake it.
+                    if (++failures >= 3) {
+                        failures = 0
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            if (playbackState == Player.STATE_IDLE) runCatching { prepare() }
+                        }, 4_000)
+                        return
+                    }
                     prepare()
                 }
             })

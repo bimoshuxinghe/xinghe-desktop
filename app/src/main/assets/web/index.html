@@ -1181,6 +1181,29 @@ document.querySelectorAll('#ss [data-mode]').forEach(b => b.onclick = async () =
   if (b.dataset.mode === state.screensaver && !state.screensaverFollows) return;
   try { take(await api('api/screensaver', { mode: b.dataset.mode })); toast(t('toast_tv_updated')); } catch (e) { toast(t('toast_set_fail')); }
 });
+/* A still of the film, made while the file is in the phone's hands: the TV's decoder will not
+   always give one (its cards stayed blank), but the browser that plays the film always can. */
+async function grabThumb(file) {
+  const url = URL.createObjectURL(file);
+  const v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.src = url;
+  try {
+    await new Promise((ok, bad) => { v.onloadeddata = ok; v.onerror = () => bad(new Error('decode')); setTimeout(() => bad(new Error('slow')), 8000); });
+    if (!v.videoWidth) throw new Error('no picture');
+    await new Promise(ok => {
+      v.onseeked = ok;
+      try { v.currentTime = Math.min(0.1, (v.duration || 1) / 10); } catch (e) { ok(); }
+      setTimeout(ok, 3000);
+    });
+    const c = document.createElement('canvas');
+    c.width = 640; c.height = Math.max(2, Math.round(640 * v.videoHeight / v.videoWidth));
+    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.85));
+    if (!blob) throw new Error('encode');
+    return blob;
+  } finally { URL.revokeObjectURL(url); }
+}
+
 $('#videoFile').onchange = async e => {
   const input = e.target; const files = [...input.files]; if (!files.length) return;
   const btn = $('#videoUploadBtn');
@@ -1191,6 +1214,8 @@ $('#videoFile').onchange = async e => {
     if (!file.size || file.size > 200 * 1024 * 1024) continue;
     try {
       const fd = new FormData(); fd.append('video', file, file.name);
+      // Where no still came of it, the TV falls back to its own first-frame decoding.
+      try { fd.append('thumb', await grabThumb(file), 'thumb.jpg'); } catch (err) {}
       const r = await fetch(base + 'api/videos/upload', { method: 'POST', body: fd });
       if (!r.ok) throw new Error(r.status);
       const next = await r.json(); if (next.saved) added++; take(next);
