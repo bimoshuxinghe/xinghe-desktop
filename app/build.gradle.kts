@@ -16,8 +16,8 @@ android {
         // Android 5.0. Compose 1.10 and later need 6.0, so the Compose BOM below stays on 1.9.
         minSdk = 21
         targetSdk = 34
-        versionCode = 63
-        versionName = "1.5.4"
+        versionCode = 64
+        versionName = "1.5.5"
         // `./gradlew -Pdiag ...`: a build for one reporter's TV whose logcat shows no app lines;
         // see system/DiagLog.kt.
         val diag = project.hasProperty("diag")

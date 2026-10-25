@@ -135,6 +135,12 @@ fun AppTile(
      * sits, so focus stays. Null everywhere else, where Up moves focus as usual.
      */
     leaveGrid: (() -> Unit)? = null,
+    /**
+     * Down from the home screen's top row opens the all-apps view and leaves focus on this tile:
+     * the view starts at its own first row, as a launcher's app grid does. Null once it is open,
+     * where Down moves focus on into the row below.
+     */
+    enterGrid: (() -> Unit)? = null,
     /** False on the glass plate: the top row shows no names there, as on tvOS 26. */
     showName: Boolean = true,
     /** The name sits on the glass plate, which ends just under it: it does not step down past the focus frame. */
@@ -297,6 +303,11 @@ fun AppTile(
                             // The all-apps view's first row: Up goes home, focus stays on this
                             // tile, which is the top row's own once the grid closes.
                             leaveGrid()
+                        } else if (down && dir == FocusDirection.Down && enterGrid != null) {
+                            // Down on the home screen's top row opens the view instead of walking
+                            // into the second row: the view's first row is the one Down is on,
+                            // and focus stays with it.
+                            enterGrid()
                         } else if (down && !focusManager.moveFocus(dir)) {
                             Sounds.limit()
                             when (dir) {

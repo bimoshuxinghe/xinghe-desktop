@@ -1,6 +1,12 @@
 package app.xinghe.tv.wallpaper
 
 import android.content.Context
+import android.graphics.ImageFormat
+import android.media.Image
+import android.media.ImageReader
+import android.media.MediaCodec
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.graphics.Bitmap
@@ -72,6 +78,9 @@ object Wallpapers {
     private const val TAG = "AerialWallpaper"
     const val LATEST_DAILY = "daily:latest"
     private const val DAILY_RETRY_MS = 30 * 60 * 1000L
+    /** How long the decoder is given to come up with one frame, and how long each step waits. */
+    private const val CODEC_FRAME_TIMEOUT_MS = 8_000L
+    private const val CODEC_WAIT_US = 10_000L
     const val AUTO = "auto"
     const val ROTATE_PHOTOS = "photos:rotate"
     const val LIVE = "aerial:live"
@@ -262,8 +271,12 @@ object Wallpapers {
      * screen came from this very video), else its first frame. The gradient stands in only when
      * there is no video to have a frame; when the video is there but its frame would not decode,
      * [videoFrameFailed] says so, so the gradient is not mistaken for the video's picture.
+     *
+     * [standIn] is off for the pickers' thumbnails: there a gradient would read as a picture of
+     * its own — the card would look like a wallpaper of Aerial's, and once cached, keep it for
+     * good — where an empty card with the film's name at least says which film it is.
      */
-    private fun videoPicture(id: String, w: Int, h: Int): Bitmap? {
+    private fun videoPicture(id: String, w: Int, h: Int, standIn: Boolean = true): Bitmap? {
         val videoId = id.removePrefix(VIDEO_PREFIX)
         // Only the chosen wallpaper's frame matters here: the sheet asks for every video's
         // thumbnail, and one of those failing says nothing about the one on screen.
@@ -276,11 +289,11 @@ object Wallpapers {
         if (video == null) {
             // The video went: there is nothing to decode, and nothing to wait for.
             if (chosen) videoFrameFailed = false
-            return Gradients.render(Gradients.presets.first(), w, h)
+            return Gradients.render(Gradients.presets.first(), w, h).takeIf { standIn }
         }
         val frame = videoFirstFrame(video, w, h)
         if (chosen) videoFrameFailed = frame == null
-        return frame ?: Gradients.render(Gradients.presets.first(), w, h)
+        return frame ?: Gradients.render(Gradients.presets.first(), w, h).takeIf { standIn }
     }
 
     /**
@@ -332,10 +345,143 @@ object Wallpapers {
         }
         // The path is not always a data source a frame can be read from: the descriptor can be.
         val stream = runCatching { FileInputStream(file) }.getOrNull() ?: return null
-        return stream.use {
+        stream.use {
             retrieve(it.fd) { mmr -> mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
-                ?.let { frame -> sized(frame, w, h) }
+                ?.let { frame -> return sized(frame, w, h) }
         }
+        // Last of all, the decoder that plays the film. Every way above is the platform's
+        // retriever, and on some TVs it answers null to all of them while the very film plays
+        // behind Home (TCL 65S515D: the video cards stayed empty through 1.5.4). A film that
+        // plays has a decoder that reads it, so ask that one.
+        return decodeFirstFrameByCodec(file, w, h)
+    }
+
+    /**
+     * The first frame of [file], decoded by the codec the wallpaper plays it with, at [w]×[h].
+     * Nothing is put on screen: the decoder is given the picture holder's surface, and the one
+     * frame it draws there is read back, turned from the decoder's YUV into a picture, and set
+     * the right way up where the film carries rotation, as the player shows it.
+     *
+     * Decoding a frame this way costs one open and one decode of the first key frame, which is
+     * why the answer is kept as a JPEG under the video's own date ([videoFirstFrame]) and this
+     * is the last thing tried, not the first.
+     */
+    private fun decodeFirstFrameByCodec(file: File, w: Int, h: Int): Bitmap? {
+        val started = android.os.SystemClock.elapsedRealtime()
+        val extractor = MediaExtractor()
+        var codec: MediaCodec? = null
+        var reader: ImageReader? = null
+        val frame = try {
+            extractor.setDataSource(file.absolutePath)
+            val track = (0 until extractor.trackCount).firstOrNull {
+                extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
+            }
+            if (track == null) {
+                Log.w(TAG, "a video has no video track to decode a frame from")
+                return null
+            }
+            extractor.selectTrack(track)
+            val format = extractor.getTrackFormat(track)
+            val mime = format.getString(MediaFormat.KEY_MIME) ?: return null
+            val sink = ImageReader.newInstance(w, h, ImageFormat.YUV_420_888, 2)
+            reader = sink
+            val c = MediaCodec.createDecoderByType(mime)
+            codec = c
+            c.configure(format, sink.surface, null, 0)
+            c.start()
+            val info = MediaCodec.BufferInfo()
+            var fed = false
+            var out: Bitmap? = null
+            while (out == null && android.os.SystemClock.elapsedRealtime() - started < CODEC_FRAME_TIMEOUT_MS) {
+                if (!fed) {
+                    val inIndex = c.dequeueInputBuffer(CODEC_WAIT_US)
+                    if (inIndex >= 0) {
+                        val buffer = c.getInputBuffer(inIndex) ?: break
+                        val read = extractor.readSampleData(buffer, 0)
+                        if (read < 0) {
+                            c.queueInputBuffer(inIndex, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+                            fed = true
+                        } else {
+                            c.queueInputBuffer(inIndex, 0, read, extractor.sampleTime, 0)
+                            extractor.advance()
+                        }
+                    }
+                }
+                when (val outIndex = c.dequeueOutputBuffer(info, CODEC_WAIT_US)) {
+                    MediaCodec.INFO_TRY_AGAIN_LATER, MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> Unit
+                    else -> if (outIndex >= 0) {
+                        // Into the holder's surface, where it can be read; the frame is dropped
+                        // from the screen either way, as nothing was ever shown.
+                        c.releaseOutputBuffer(outIndex, true)
+                        for (tries in 0 until 8) {
+                            // The decoder may hand back the frame at its own size: read it as it
+                            // lies and scale afterwards, rather than reading past its edges.
+                            out = sink.acquireLatestImage()?.let { image ->
+                                try { yuvToBitmap(image)?.let { sized(it, w, h) } } finally { image.close() }
+                            }
+                            if (out != null) break
+                            Thread.sleep(25)
+                        }
+                    }
+                }
+            }
+            // Up the way the player shows it: a film shot upright carries its rotation in the file.
+            val turned = out?.let { rotate(it, videoRotation(file)) }
+            if (turned != null && turned !== out) out?.recycle()
+            turned
+        } catch (e: Exception) {
+            Log.w(TAG, "could not decode a video's first frame with its codec", e)
+            null
+        } finally {
+            runCatching { codec?.stop() }
+            runCatching { codec?.release() }
+            runCatching { reader?.close() }
+            runCatching { extractor.release() }
+        }
+        Log.i(TAG, "video first frame by codec: ${frame != null} in ${android.os.SystemClock.elapsedRealtime() - started} ms")
+        return frame
+    }
+
+    /** How the film is to be turned to stand the way it was shot, as its own metadata has it. */
+    private fun videoRotation(file: File): Int =
+        retrieve(file.absolutePath) { it.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() } ?: 0
+
+    private fun rotate(frame: Bitmap, degrees: Int): Bitmap? {
+        if (degrees % 360 == 0) return frame
+        val m = android.graphics.Matrix().apply { postRotate(degrees.toFloat()) }
+        return runCatching { Bitmap.createBitmap(frame, 0, 0, frame.width, frame.height, m, true) }
+            .onFailure { Log.w(TAG, "could not turn a decoded frame", it) }.getOrNull() ?: frame
+    }
+
+    /**
+     * One YUV frame of the decoder as a picture: the planes are read as they lie, semi-planar or
+     * planar alike, so a TV's own layout is no matter. Called off the main thread, for one frame.
+     */
+    private fun yuvToBitmap(image: Image): Bitmap? {
+        if (image.format != ImageFormat.YUV_420_888 || image.planes.size < 3) return null
+        val w = image.width
+        val h = image.height
+        val (y, u, v) = image.planes
+        val yb = y.buffer; val ub = u.buffer; val vb = v.buffer
+        val pixels = IntArray(w * h)
+        var at = 0
+        for (j in 0 until h) {
+            val yRow = j * y.rowStride
+            val cRow = (j shr 1) * u.rowStride
+            val cRowV = (j shr 1) * v.rowStride
+            for (i in 0 until w) {
+                val luma = yb.get(yRow + i * y.pixelStride).toInt() and 0xFF
+                val cb = ub.get(cRow + (i shr 1) * u.pixelStride).toInt() and 0xFF
+                val cr = vb.get(cRowV + (i shr 1) * v.pixelStride).toInt() and 0xFF
+                // The studio range the decoder hands out, to the screen's, as the player does.
+                val l = (luma - 16).coerceAtLeast(0)
+                val r = (1.164f * l + 1.596f * (cr - 128)).toInt().coerceIn(0, 255)
+                val g = (1.164f * l - 0.392f * (cb - 128) - 0.813f * (cr - 128)).toInt().coerceIn(0, 255)
+                val b = (1.164f * l + 2.017f * (cb - 128)).toInt().coerceIn(0, 255)
+                pixels[at++] = 0xFF000000.toInt() or (r shl 16) or (g shl 8) or b
+            }
+        }
+        return Bitmap.createBitmap(pixels, w, h, Bitmap.Config.ARGB_8888)
     }
 
     /** Opens a retriever on [path] and asks it for a frame; null when this way does not work here. */
@@ -379,7 +525,14 @@ object Wallpapers {
     fun thumbnail(id: String): Bitmap? {
         synchronized(thumbs) { thumbs[id] }?.let { return it }
         val wp = (if (id == LATEST_DAILY || id == ROTATE_PHOTOS) resolve(id) else items.firstOrNull { it.id == id }) ?: return null
-        val b = if (wp.kind == WallpaperKind.Auto) Gradients.render(Gradients.autoThumb, 384, 216) else picture(wp, 384, 216)
+        val b = when (wp.kind) {
+            WallpaperKind.Auto -> Gradients.render(Gradients.autoThumb, 384, 216)
+            // A video whose own frame will not decode is left without a picture here, rather than
+            // given a gradient: the pickers show which film it is by its name, and a stand-in
+            // cached once would keep the card from ever showing the frame that came later.
+            WallpaperKind.Video -> videoPicture(wp.id, 384, 216, standIn = false)
+            else -> picture(wp, 384, 216)
+        }
         if (b != null) synchronized(thumbs) { thumbs[id] = b }
         return b
     }
@@ -563,6 +716,19 @@ object Wallpapers {
     }
 
     /**
+     * Decodes every film's first frame ahead of the folder that lists them, off the main thread.
+     * The cards ask for all of them at once, and on a TV where only the decoder will read them,
+     * that first look is the slow one: done while the phone is still waiting after an upload, the
+     * folder opens with its cards whole. Frames already on disk cost nothing.
+     */
+    private fun warmFirstFrames(videos: List<ScreensaverVideo>) {
+        if (videos.isEmpty()) return
+        scope.launch(Dispatchers.IO) {
+            videos.forEach { runCatching { thumbnail(videoWallpaperId(it.id)) } }
+        }
+    }
+
+    /**
      * Rescans the uploaded videos and rebuilds the list when they have changed: called at start and
      * from the phone page after a video is added or deleted, so the card appears (or goes) at once.
      */
@@ -571,10 +737,15 @@ object Wallpapers {
         scope.launch(Dispatchers.IO) {
             val videos = ScreensaverVideos.all(app)
             scope.launch(Dispatchers.Main) {
-                val listed = items.any { it.kind == WallpaperKind.Video }
+                // Every film on its own, not just whether there are any: a second or third film
+                // uploaded while one was already listed never reached the folder (the list was
+                // only rebuilt when the folder went from empty to not, or the other way).
+                val listed = items.filter { it.kind == WallpaperKind.Video }.map { it.id }.toSet()
+                val onHand = videos.map { videoWallpaperId(it.id) }.toSet()
                 val chosenGone = videoSelected && videos.none { videoWallpaperId(it.id) == selectedId }
-                if (videos.isNotEmpty() != listed || chosenGone) {
+                if (listed != onHand || chosenGone) {
                     rebuildList()
+                    warmFirstFrames(videos)
                     if (chosenGone) {
                         // The video that was chosen went: the first of those left, or the daily photo.
                         select(videos.firstOrNull()?.let { videoWallpaperId(it.id) } ?: LATEST_DAILY)

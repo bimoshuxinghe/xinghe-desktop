@@ -201,8 +201,9 @@ fun HomeScreen(
     val firmwareInputPanel = remember { SystemProbe.tclInputPanel(appContext) != null }
 
     var focusedKey by remember { mutableStateOf<String?>(null) }
-    // The all-apps view. It opens once focus walks down into the grid (Down from the top row, or
-    // a drag into it). Up from the grid's first row closes it again, as Back and the Home key do.
+    // The all-apps view. It opens on Down from the top row, which keeps focus on that row — the
+    // view's own first one — or once focus walks into the grid from below (Up from a lower row,
+    // a restored focus). Up from the grid's first row closes it again, as Back and the Home key do.
     var gridMode by remember { mutableStateOf(false) }
     // Where focus goes when the overlay closes, when that is not the tile it was on. Kept apart
     // from focusedKey: a closing menu hands focus to whatever tile lies under it first.
@@ -425,8 +426,9 @@ fun HomeScreen(
         }
         val collapsePx = with(density) { (metrics.topRowY - metrics.restY).toPx() }
 
-        // In the all-apps view the first row is part of the grid: the scroll stays where it is
-        // when focus rests on that row, instead of carrying you back out to the top row.
+        // In the all-apps view the first row is part of the grid: it lies at the top of the
+        // screen whether focus rests on it — the view has just opened — or one row below, so
+        // the scroll does not carry you back out to the home screen's top row.
         val target = with(density) {
             metrics.scrollFor(if (gridMode) maxOf(focusedRow, 1) else focusedRow, rows).toPx()
         }
@@ -658,6 +660,10 @@ fun HomeScreen(
                                     if (f > 0f) translationY = f * 18.dp.toPx()
                                 },
                             rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
+                            // Down from the home screen's top row opens the all-apps view and
+                            // leaves focus where it is: the view starts at its own first row,
+                            // the one Down was on, rather than at the second.
+                            enterGrid = if (!gridMode && index < COLUMNS && rows > 1) { { gridMode = true } } else null,
                             // Up from the all-apps view's first row goes home: back to the top
                             // row, where this very tile sits, so focus stays.
                             leaveGrid = if (gridMode && index < COLUMNS) { { gridMode = false } } else null,
