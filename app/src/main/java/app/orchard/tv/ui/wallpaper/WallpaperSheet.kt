@@ -301,6 +301,7 @@ private fun WallpaperRows() {
     val list = remember(items, selected, dailyTitle, rotateTitle) {
         buildList {
             addAll(items.filter { it.kind == WallpaperKind.Live })
+            addAll(items.filter { it.kind == WallpaperKind.Video })
             if (items.any { it.kind == WallpaperKind.Daily }) add(Wallpaper(Wallpapers.LATEST_DAILY, WallpaperKind.Daily, dailyTitle))
             addAll(items.filter { it.kind == WallpaperKind.Daily && it.id == selected })
             val photos = items.filter { it.kind == WallpaperKind.Photo }
@@ -333,6 +334,7 @@ private fun WallpaperRows() {
 @Composable
 private fun wallpaperNote(wp: Wallpaper): String? = when {
     wp.kind == WallpaperKind.Live -> stringResource(R.string.wp_live)
+    wp.kind == WallpaperKind.Video -> stringResource(R.string.wp_video)
     wp.id == Wallpapers.LATEST_DAILY -> stringResource(R.string.wp_daily_note)
     wp.id == Wallpapers.ROTATE_PHOTOS -> stringResource(R.string.wp_photos_rotate_note)
     wp.kind == WallpaperKind.Photo -> stringResource(R.string.wp_photo_note)
@@ -376,8 +378,9 @@ private fun WallpaperCard(wp: Wallpaper, focusRequester: FocusRequester?, onFocu
                         contentAlignment = Alignment.Center,
                     ) { GlyphIcon(Glyph.Check, Palette.OnFocus, 13.dp) }
                 }
-                // The aerial wallpaper moves; its card shows the last frame it stopped on.
-                if (wp.kind == WallpaperKind.Live) {
+                // The moving wallpapers (aerial films, the owner's videos) show a play mark; the
+                // aerial card shows the last frame it stopped on.
+                if (wp.kind == WallpaperKind.Live || wp.kind == WallpaperKind.Video) {
                     GlyphIcon(Glyph.Play, Color.White, 22.dp, Modifier.align(Alignment.BottomStart).padding(7.dp))
                 }
             }

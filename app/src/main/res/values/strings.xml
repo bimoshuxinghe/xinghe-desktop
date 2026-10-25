@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Aerial</string>
+    <string name="app_name">星河桌面</string>
     <string name="guard_name">Aerial Home Guard</string>
     <string name="guard_description">Keeps Aerial as your home screen on TVs that do not let you change it. Reads no screen content.</string>
 
@@ -87,6 +87,7 @@
     <string name="wx_thunder">Thunderstorm</string>
     <string name="wp_daily_latest">Daily Photo</string>
     <string name="wp_live">Moving aerial films. They start after 10 seconds still on the top row of Home and stop on the frame showing at any key, which stays as the picture; the next film picks up from there.</string>
+    <string name="wp_video">Your uploaded videos play behind Home. They start after 10 seconds still on the top row and stop on the frame showing at any key, which stays as the picture; the next video picks up from there. Upload videos on the screensaver page.</string>
     <string name="wp_photos_rotate">My Photos, Daily</string>
     <string name="wp_daily_note">Bing\'s photo of the day, changing to the new one every day.</string>
     <string name="wp_photos_rotate_note">A different one of your photos each day.</string>

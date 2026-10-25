@@ -16,13 +16,13 @@ import java.security.MessageDigest
  *
  * tvOS's standard focus relies on the Siri Remote's touch surface: the icon tilts with the thumb, and
  * that motion is what the eye follows. With the D-pad remotes these TVs ship with, the icon only
- * grows, and owners lost track of it. High Contrast adds a white frame and is the default here.
+ * grows, and owners lost track of it; High Contrast adds a white frame. Standard is the default here.
  */
 enum class FocusStyle(val key: String) {
     Standard("standard"), HighContrast("high_contrast");
 
     companion object {
-        fun of(key: String?) = entries.firstOrNull { it.key == key } ?: HighContrast
+        fun of(key: String?) = entries.firstOrNull { it.key == key } ?: Standard
     }
 }
 
@@ -44,7 +44,7 @@ object AerialSettings {
     private var started = false
     private lateinit var app: Context
 
-    var focusStyle by mutableStateOf(FocusStyle.HighContrast); private set
+    var focusStyle by mutableStateOf(FocusStyle.Standard); private set
 
 
     /** TV inputs pinned to Home as tiles, by TvInputInfo id. */
@@ -69,7 +69,7 @@ object AerialSettings {
     var oneRowHome by mutableStateOf(true); private set
 
     /** In one-row mode, the top of the second row peeking under the first; off hides it until you go down. */
-    var peekNextRow by mutableStateOf(true); private set
+    var peekNextRow by mutableStateOf(false); private set
 
     /** Interface sounds (system/Sounds), as tvOS plays them on every press. */
     var uiSounds by mutableStateOf(UiSounds.Tv); private set
@@ -132,7 +132,7 @@ object AerialSettings {
         pinSet = pinHash != null
         pinArrows = prefs.getBoolean("pin_arrows", false)
         oneRowHome = prefs.getBoolean("one_row_home", true)
-        peekNextRow = prefs.getBoolean("peek_next_row", true)
+        peekNextRow = prefs.getBoolean("peek_next_row", false)
         clockRight = prefs.getBoolean("clock_right", false)
         largeClock = prefs.getBoolean("large_clock", false)
         homePlate = prefs.getBoolean("home_plate", true)

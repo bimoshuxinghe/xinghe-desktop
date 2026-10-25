@@ -82,6 +82,7 @@ class PhoneServer private constructor(private val context: Context, private val 
                 session.method == Method.POST && path == "/api/videos/upload" -> video(session)
                 session.method == Method.POST && path == "/api/videos/delete" -> {
                     val removed = ScreensaverVideos.delete(context, form(session)["id"].orEmpty())
+                    Wallpapers.refreshVideos()
                     json(state().put("removed", removed))
                 }
                 path.startsWith("/tile/") -> tile(java.net.URLDecoder.decode(path.removePrefix("/tile/"), "UTF-8"))
@@ -325,6 +326,7 @@ class PhoneServer private constructor(private val context: Context, private val 
         val path = files["video"] ?: return text(Response.Status.BAD_REQUEST, "no video")
         val name = session.parameters["video"]?.firstOrNull().orEmpty()
         val saved = ScreensaverVideos.add(context, File(path), name) != null
+        Wallpapers.refreshVideos()
         return json(state().put("saved", saved))
     }
 

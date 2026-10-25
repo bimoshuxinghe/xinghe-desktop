@@ -52,7 +52,7 @@ sealed interface Overlay {
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
 }
 
-enum class CcPage { Main, Inputs, InputSettings, Update, Setup }
+enum class CcPage { Main, Inputs, InputSettings, Setup }
 
 /** Time since boot at which the app list is looked at again; see HomeViewModel.catchUpAfterBoot. */
 private val BOOT_CATCH_UP_MS = listOf(60_000L, 180_000L)

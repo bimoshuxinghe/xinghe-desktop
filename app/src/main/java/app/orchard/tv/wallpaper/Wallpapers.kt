@@ -1,6 +1,7 @@
 package app.orchard.tv.wallpaper
 
 import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -29,7 +30,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 
-enum class WallpaperKind { Daily, Builtin, Photo, Auto, Live }
+enum class WallpaperKind { Daily, Builtin, Photo, Auto, Live, Video }
 
 data class Wallpaper(
     val id: String,
@@ -70,6 +71,7 @@ object Wallpapers {
     const val AUTO = "auto"
     const val ROTATE_PHOTOS = "photos:rotate"
     const val LIVE = "aerial:live"
+    const val VIDEO = "video:all"
     private const val FOLLOW = "follow"
     private const val DEFAULT_FALLBACK = "grad:aurora"
 
@@ -93,11 +95,15 @@ object Wallpapers {
 
     /**
      * The screensaver in effect. Until one is chosen it follows the wallpaper: aerial films with the
-     * aerial wallpaper (and in "Follow App", which has no picture), photos with a picture, starting
-     * from that picture.
+     * aerial wallpaper, the owner's videos with the video wallpaper, photos with a picture, starting
+     * from that picture. "Follow App", having no picture, carries the aerial films on.
      */
     val screensaver: ScreensaverMode
-        get() = chosenScreensaver ?: if (selectedId == LIVE || selectedId == AUTO) ScreensaverMode.Aerial else ScreensaverMode.Photos
+        get() = chosenScreensaver ?: when (selectedId) {
+            LIVE, AUTO -> ScreensaverMode.Aerial
+            VIDEO -> ScreensaverMode.Videos
+            else -> ScreensaverMode.Photos
+        }
 
     /** No screensaver chosen: it follows the wallpaper. */
     val screensaverFollows: Boolean get() = chosenScreensaver == null
@@ -223,6 +229,28 @@ object Wallpapers {
         // Until a film has stopped on a frame, the first built-in stands in.
         WallpaperKind.Live -> liveFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
             ?: Gradients.render(Gradients.presets.first(), w, h)
+        // The video wallpaper's picture is the first video's first frame, until one has stopped.
+        WallpaperKind.Video -> firstVideoFrame(w, h) ?: Gradients.render(Gradients.presets.first(), w, h)
+    }
+
+    /** The first frame of the first uploaded video, for the picture and the thumbnail. */
+    private fun firstVideoFrame(w: Int, h: Int): Bitmap? {
+        val video = ScreensaverVideos.all(app).firstOrNull() ?: return null
+        val mmr = MediaMetadataRetriever()
+        return try {
+            mmr.setDataSource(video.file.absolutePath)
+            val frame = if (Build.VERSION.SDK_INT >= 27) mmr.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, w, h)
+            else mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+            frame?.let {
+                val sized = if (it.width == w && it.height == h) it else Bitmap.createScaledBitmap(it, w, h, true)
+                if (sized.isMutable && sized.config == Bitmap.Config.ARGB_8888) sized else sized.copy(Bitmap.Config.ARGB_8888, true)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "could not decode the video wallpaper's frame", e)
+            null
+        } finally {
+            runCatching { mmr.release() }
+        }
     }
 
     /** A 16:9 thumbnail for pickers and the phone page. Call off the main thread. */
@@ -275,6 +303,8 @@ object Wallpapers {
         val stamp = when (wp.kind) {
             WallpaperKind.Daily, WallpaperKind.Photo -> fileFor(wp)?.lastModified() ?: 0L
             WallpaperKind.Live -> liveFrame.lastModified()
+            // The videos folder's mtime: the picture is the first video's first frame until a film stops.
+            WallpaperKind.Video -> File(app.filesDir, "screensaver-videos").lastModified()
             else -> 0L
         }
         return "${wp.id}|$stamp|${screenW}x$screenH|${BuildConfig.VERSION_CODE}"
@@ -389,7 +419,33 @@ object Wallpapers {
             .map { Wallpaper("photo:${it.nameWithoutExtension}", WallpaperKind.Photo, if (zh) "我的照片" else "My Photo") }
         val auto = Wallpaper(AUTO, WallpaperKind.Auto, if (zh) "跟随 App" else "Follow App")
         val live = Wallpaper(LIVE, WallpaperKind.Live, if (zh) "航拍" else "Aerial")
-        items = listOf(live) + daily + builtins + photos + auto
+        // The video wallpaper exists only while there is something to play; the list is rebuilt
+        // when videos are added or removed (refreshVideos).
+        val video = if (ScreensaverVideos.all(app).isEmpty()) null
+            else Wallpaper(VIDEO, WallpaperKind.Video, if (zh) "视频壁纸" else "Video")
+        items = listOfNotNull(live, video) + daily + builtins + photos + auto
+    }
+
+    /**
+     * Rescans the uploaded videos and rebuilds the list when they have changed: called at start and
+     * from the phone page after a video is added or deleted, so the card appears (or goes) at once.
+     */
+    fun refreshVideos() {
+        if (!started) return
+        scope.launch(Dispatchers.IO) {
+            val videos = ScreensaverVideos.all(app)
+            scope.launch(Dispatchers.Main) {
+                val listed = items.any { it.kind == WallpaperKind.Video }
+                if (videos.isNotEmpty() != listed) {
+                    rebuildList()
+                    if (selectedId == VIDEO && videos.isEmpty()) select(LATEST_DAILY)
+                    if (selectedId == VIDEO) rebuildBackdrop()
+                } else if (selectedId == VIDEO) {
+                    // The set changed without the card going: the baked picture may be stale.
+                    rebuildBackdrop()
+                }
+            }
+        }
     }
 
     // ---- daily photos ----

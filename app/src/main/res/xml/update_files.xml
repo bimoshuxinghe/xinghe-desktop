@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<!-- The downloaded update, handed to the system installer (update/Updates.kt). -->
-<paths>
-    <cache-path name="updates" path="updates/" />
-</paths>

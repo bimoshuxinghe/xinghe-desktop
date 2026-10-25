@@ -79,6 +79,7 @@
     <string name="wx_thunder">Гроза</string>
     <string name="wp_daily_latest">Завжди сьогоднішнє</string>
     <string name="wp_live">Аерозйомка · запускається через 10 секунд на головному екрані</string>
+    <string name="wp_video">Завантажені відео відтворюються за головним екраном: через 10 секунд спокою показ починається, будь-яка клавіша зупиняє кадр, який лишається зображенням; наступне відео триває звідти.</string>
     <string name="wp_photos_rotate">Одне на день</string>
     <string name="wp_daily_note">Фото дня від Bing, щодня нове.</string>
     <string name="wp_photos_rotate_note">Щодня інше з ваших фото.</string>

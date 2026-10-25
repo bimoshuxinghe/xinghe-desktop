@@ -2,6 +2,7 @@ package app.orchard.tv.ui.home
 
 import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -24,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.graphics.createBitmap
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -35,6 +37,7 @@ import app.orchard.tv.wallpaper.AerialFormats
 import app.orchard.tv.wallpaper.AerialQuality
 import app.orchard.tv.wallpaper.AerialStream
 import app.orchard.tv.wallpaper.Aerials
+import app.orchard.tv.wallpaper.ScreensaverVideos
 import app.orchard.tv.wallpaper.Wallpapers
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -147,7 +150,48 @@ fun LiveWallpaper(
         showing = false
     }
 
-    fun open(): ExoPlayer {
+    /** The owner's uploaded videos (ScreensaverVideos), local files, looping muted behind Home. */
+    fun openLocal(): ExoPlayer {
+        val videos = ScreensaverVideos.all(context)
+        // Where the picture on screen came from one of them, pick up there; else the first in line.
+        val spot = Wallpapers.liveSpot()
+        val resume = spot?.let { (id, _) -> videos.firstOrNull { "local:${it.id}" == id } }
+        val films = if (resume != null) listOf(resume) + (videos - resume) else videos
+        var failures = 0
+        return ExoPlayer.Builder(context).build().apply {
+            volume = 0f
+            repeatMode = Player.REPEAT_MODE_ALL
+            videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
+            addListener(object : Player.Listener {
+                override fun onRenderedFirstFrame() {
+                    showing = isPlaying
+                    failures = 0
+                }
+
+                override fun onIsPlayingChanged(isPlaying: Boolean) {
+                    showing = isPlaying
+                }
+
+                override fun onPlayerError(error: PlaybackException) {
+                    DiagLog.i("video wallpaper failed (${error.errorCodeName})")
+                    // Three in a row: nothing playable; the picture stays as it is.
+                    if (++failures >= 3) return
+                    seekToNextMediaItem()
+                    prepare()
+                }
+            })
+            setMediaItems(
+                films.map { MediaItem.Builder().setUri(Uri.fromFile(it.file)).setMediaId("local:${it.id}").build() },
+                0,
+                if (resume != null) spot?.second ?: 0L else 0L,
+            )
+            surface?.let { setVideoSurfaceView(it) }
+            prepare()
+            live.player = this
+        }
+    }
+
+    fun openAerial(): ExoPlayer {
         val quality = AerialFormats.forWallpaper(context)
         val overHttp = Build.VERSION.SDK_INT < Build.VERSION_CODES.N
         val all = Aerials.all(context).shuffled()
@@ -188,6 +232,9 @@ fun LiveWallpaper(
             live.film = films.first()
         }
     }
+
+    fun open(): ExoPlayer =
+        if (Wallpapers.selectedId == Wallpapers.VIDEO) openLocal() else openAerial()
 
     // The film on screen, opened ahead for its frames (see FrameReader), and a small key frame
     // taken every few seconds while it moves: the glass for wherever it stops is then at hand.
@@ -409,12 +456,21 @@ private class FrameReader(private val context: android.content.Context) {
     private fun retrieverFor(id: String): MediaMetadataRetriever? {
         if (openFor == id) retriever?.let { return it }
         close0()
-        val film = Aerials.all(context).firstOrNull { it.id == id } ?: return null
-        val url = AerialStream.url(film, AerialQuality.Hd, Build.VERSION.SDK_INT < Build.VERSION_CODES.N)
         val started = android.os.SystemClock.elapsedRealtime()
         val mmr = MediaMetadataRetriever()
+        val opened = if (id.startsWith("local:")) {
+            // The video wallpaper's films are local files (ScreensaverVideos).
+            ScreensaverVideos.all(context).firstOrNull { "local:${it.id}" == id }?.file
+        } else {
+            null
+        }
         return try {
-            mmr.setDataSource(url, emptyMap())
+            if (opened != null) mmr.setDataSource(opened.absolutePath)
+            else {
+                val film = Aerials.all(context).firstOrNull { it.id == id } ?: run { runCatching { mmr.release() }; return null }
+                val url = AerialStream.url(film, AerialQuality.Hd, Build.VERSION.SDK_INT < Build.VERSION_CODES.N)
+                mmr.setDataSource(url, emptyMap())
+            }
             DiagLog.i("wallpaper film file opened in ${android.os.SystemClock.elapsedRealtime() - started} ms")
             retriever = mmr
             openFor = id

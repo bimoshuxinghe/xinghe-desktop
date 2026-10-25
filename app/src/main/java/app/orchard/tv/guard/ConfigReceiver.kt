@@ -6,7 +6,6 @@ import android.content.Intent
 import app.orchard.tv.apps.TileSheet
 import app.orchard.tv.settings.AerialSettings
 import app.orchard.tv.system.DiagLog
-import app.orchard.tv.update.Updates
 import app.orchard.tv.wallpaper.ScreensaverMode
 import app.orchard.tv.wallpaper.Wallpapers
 import kotlinx.coroutines.launch
@@ -61,15 +60,6 @@ class ConfigReceiver : BroadcastReceiver() {
         if (intent.hasExtra("diag")) DiagLog.setEnabled(context, intent.getBooleanExtra("diag", false))
         for (key in listOf("mode_switch", "soft_layer")) {
             if (intent.hasExtra(key)) DiagLog.setOption(context, key, intent.getBooleanExtra(key, false))
-        }
-        if (intent.hasExtra("update_test")) {
-            Updates.testApk = if (intent.getBooleanExtra("update_test", false)) {
-                java.io.File(context.getExternalFilesDir(null) ?: context.filesDir, "update-test.apk")
-            } else null
-        }
-        if (intent.getBooleanExtra("check_update", false)) {
-            Updates.init(context)
-            Updates.checkIfStale(force = true)
         }
         if (intent.hasExtra("keep_adb")) GuardSetup.setKeepAdb(context, intent.getBooleanExtra("keep_adb", false))
         // ... --ei adb_probe_port <port>   (verify the keep_adb toggle without closing a working

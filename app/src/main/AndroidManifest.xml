@@ -14,9 +14,6 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         tools:ignore="CoarseFineLocation" />
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
-    <!-- Installing a new version from Control Center (update/Updates.kt). On TVs without the
-         "install unknown apps" page (TCL) tools/install.sh allows it over ADB. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <!-- Both granted only over ADB by tools/install.sh, never requested in the app:
          - WRITE_SECURE_SETTINGS lets Aerial turn Home Guard back on after firmwares that
@@ -92,16 +89,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.files"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/update_files" />
-        </provider>
 
         <receiver
             android:name=".guard.BootReceiver"

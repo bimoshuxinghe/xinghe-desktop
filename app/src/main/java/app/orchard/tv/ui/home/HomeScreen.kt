@@ -490,8 +490,9 @@ fun HomeScreen(
                     (metrics.topRowY + metrics.tileH + PlatePadV + metrics.firstGap).toPx(),
                 )
             }
-            // The aerial wallpaper's film, under everything; it moves only on a still top row.
-            if (Wallpapers.selectedId == Wallpapers.LIVE) {
+            // The moving wallpaper's film (aerial films, or the owner's videos), under everything;
+            // it moves only on a still top row.
+            if (Wallpapers.selectedId == Wallpapers.LIVE || Wallpapers.selectedId == Wallpapers.VIDEO) {
                 LiveWallpaper(
                     moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && !pastShelf &&
                         focusedRow == 0 && moving == null,
