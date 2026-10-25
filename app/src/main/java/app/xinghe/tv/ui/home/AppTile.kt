@@ -130,8 +130,11 @@ fun AppTile(
     modifier: Modifier = Modifier,
     /** Last tile of its row: Right stops here instead of finding the status pill above (#211). */
     rowEnd: Boolean = false,
-    /** Up stops here (the all-apps view's first row): the search fails and the tile nudges. */
-    upBlocked: Boolean = false,
+    /**
+     * Up leaves the all-apps view from its first row: back to the top row, where this very tile
+     * sits, so focus stays. Null everywhere else, where Up moves focus as usual.
+     */
+    leaveGrid: (() -> Unit)? = null,
     /** False on the glass plate: the top row shows no names there, as on tvOS 26. */
     showName: Boolean = true,
     /** The name sits on the glass plate, which ends just under it: it does not step down past the focus frame. */
@@ -290,7 +293,11 @@ fun AppTile(
                         else -> null
                     }
                     if (dir != null) {
-                        if (down && !focusManager.moveFocus(dir)) {
+                        if (down && dir == FocusDirection.Up && leaveGrid != null) {
+                            // The all-apps view's first row: Up goes home, focus stays on this
+                            // tile, which is the top row's own once the grid closes.
+                            leaveGrid()
+                        } else if (down && !focusManager.moveFocus(dir)) {
                             Sounds.limit()
                             when (dir) {
                                 FocusDirection.Left -> nudge(-1f, 0f)
@@ -373,7 +380,6 @@ fun AppTile(
                 }
                 .focusProperties {
                     if (rowEnd) right = FocusRequester.Cancel
-                    if (upBlocked) up = FocusRequester.Cancel
                 }
                 .focusable(enabled),
         ) {

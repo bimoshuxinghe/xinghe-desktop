@@ -25,6 +25,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileDescriptor
+import java.io.FileInputStream
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -97,6 +99,14 @@ object Wallpapers {
     private val liveFrame by lazy { File(app.filesDir, "live-frame.jpg") }
     /** The video wallpaper's stopped frame, kept apart from the aerial films' one (their cards and pictures differ). */
     private val videoFrame by lazy { File(app.filesDir, "video-frame.jpg") }
+    /** The chosen videos' first frames, decoded once each and kept as JPEGs, by size. */
+    private val firstFrameDir by lazy { File(app.filesDir, "video-frames").apply { mkdirs() } }
+    /**
+     * Whether the last try at the chosen video's own first frame came to nothing, so the gradient
+     * standing in for it is all there is. The baked pair must not keep it past this start:
+     * 1.5.3 baked the gradient for good where the frame would not decode.
+     */
+    @Volatile private var videoFrameFailed = false
     private val bakedDir by lazy { File(app.filesDir, "backdrop").apply { mkdirs() } }
     private val thumbs = HashMap<String, Bitmap>()
 
@@ -249,34 +259,120 @@ object Wallpapers {
 
     /**
      * The picture of one of the owner's videos: the frame it last stopped on (when the film on
-     * screen came from this very video), else its first frame.
+     * screen came from this very video), else its first frame. The gradient stands in only when
+     * there is no video to have a frame; when the video is there but its frame would not decode,
+     * [videoFrameFailed] says so, so the gradient is not mistaken for the video's picture.
      */
     private fun videoPicture(id: String, w: Int, h: Int): Bitmap? {
         val videoId = id.removePrefix(VIDEO_PREFIX)
+        // Only the chosen wallpaper's frame matters here: the sheet asks for every video's
+        // thumbnail, and one of those failing says nothing about the one on screen.
+        val chosen = id == selectedId
         if (liveSpot()?.first?.removePrefix("local:") == videoId) {
+            if (chosen) videoFrameFailed = false
             videoFrame.takeIf { it.exists() }?.let { return Images.decodeCover(it, w, h) }
         }
         val video = ScreensaverVideos.all(app).firstOrNull { it.id == videoId }
-        return video?.let { videoFirstFrame(it, w, h) } ?: Gradients.render(Gradients.presets.first(), w, h)
+        if (video == null) {
+            // The video went: there is nothing to decode, and nothing to wait for.
+            if (chosen) videoFrameFailed = false
+            return Gradients.render(Gradients.presets.first(), w, h)
+        }
+        val frame = videoFirstFrame(video, w, h)
+        if (chosen) videoFrameFailed = frame == null
+        return frame ?: Gradients.render(Gradients.presets.first(), w, h)
     }
 
-    /** The first frame of one of the owner's videos, for its picture and its thumbnail. */
+    /**
+     * The first frame of one of the owner's videos, for its picture and its thumbnail. Decoded
+     * once and kept as a JPEG under the video's own date, per size asked for: the wallpaper
+     * sheet asks for every video's thumbnail and Home for the chosen one's picture, on every
+     * start, and decoding is the slow part.
+     *
+     * The decoding is tried every way a device has been seen to allow it. The scaled call (API
+     * 27) is the one that should do it, and the one that fails on the most devices — a video
+     * with rotation metadata, an awkward size, or time 0 itself, and it answers null. Some
+     * devices read the path but not a frame from it, where the file descriptor works. 1.5.3
+     * took the first null for the whole answer, and showed a gradient where the video's own
+     * first frame should be (TCL 65S515D).
+     */
     private fun videoFirstFrame(video: ScreensaverVideo, w: Int, h: Int): Bitmap? {
+        val cache = File(firstFrameDir, "first-${video.id}-${video.file.lastModified()}-${w}x$h.jpg")
+        if (cache.exists()) BitmapFactory.decodeFile(cache.path)?.let { return it }
+        val frame = decodeFirstFrame(video.file, w, h) ?: return null
+        runCatching {
+            cache.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            // The same video's other sizes, or an older cut of it, are no longer of use.
+            firstFrameDir.listFiles()?.forEach { f ->
+                if (f != cache && f.name.startsWith("first-${video.id}-")) f.delete()
+            }
+        }.onFailure { Log.w(TAG, "could not keep a video's first frame", it) }
+        return frame
+    }
+
+    /** Every way of asking for the first frame, until one answers. */
+    private fun decodeFirstFrame(file: File, w: Int, h: Int): Bitmap? {
+        val path = file.absolutePath
+        if (Build.VERSION.SDK_INT >= 27) {
+            // Scaled straight to the size asked for: one decode, no second bitmap.
+            retrieve(path) { it.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, w, h) }
+                ?.let { return sized(it, w, h) }
+        }
+        retrieve(path) { it.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
+            ?.let { return sized(it, w, h) }
+        retrieve(path) { it.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST) }
+            ?.let { return sized(it, w, h) }
+        retrieve(path) { it.getFrameAtTime() }?.let { return sized(it, w, h) }
+        // Time 0 is itself what some devices answer null to: a hair later is the same frame.
+        for (us in longArrayOf(1L, 1_000L, 250_000L)) {
+            retrieve(path) { it.getFrameAtTime(us, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
+                ?.let { return sized(it, w, h) }
+            retrieve(path) { it.getFrameAtTime(us, MediaMetadataRetriever.OPTION_CLOSEST) }
+                ?.let { return sized(it, w, h) }
+        }
+        // The path is not always a data source a frame can be read from: the descriptor can be.
+        val stream = runCatching { FileInputStream(file) }.getOrNull() ?: return null
+        return stream.use {
+            retrieve(it.fd) { mmr -> mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
+                ?.let { frame -> sized(frame, w, h) }
+        }
+    }
+
+    /** Opens a retriever on [path] and asks it for a frame; null when this way does not work here. */
+    private fun <T> retrieve(path: String, body: (MediaMetadataRetriever) -> T?): T? {
         val mmr = MediaMetadataRetriever()
         return try {
-            mmr.setDataSource(video.file.absolutePath)
-            val frame = if (Build.VERSION.SDK_INT >= 27) mmr.getScaledFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC, w, h)
-            else mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
-            frame?.let {
-                val sized = if (it.width == w && it.height == h) it else Bitmap.createScaledBitmap(it, w, h, true)
-                if (sized.isMutable && sized.config == Bitmap.Config.ARGB_8888) sized else sized.copy(Bitmap.Config.ARGB_8888, true)
-            }
+            mmr.setDataSource(path)
+            body(mmr)
         } catch (e: Exception) {
-            Log.w(TAG, "could not decode a video's frame", e)
+            Log.w(TAG, "could not read a video frame by path", e)
             null
         } finally {
             runCatching { mmr.release() }
         }
+    }
+
+    /** The same over a file descriptor. */
+    private fun <T> retrieve(fd: FileDescriptor, body: (MediaMetadataRetriever) -> T?): T? {
+        val mmr = MediaMetadataRetriever()
+        return try {
+            mmr.setDataSource(fd)
+            body(mmr)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not read a video frame by descriptor", e)
+            null
+        } finally {
+            runCatching { mmr.release() }
+        }
+    }
+
+    /** The frame at [w]×[h], in the config the rest of the wallpaper code expects. */
+    private fun sized(frame: Bitmap, w: Int, h: Int): Bitmap {
+        val scaled = if (frame.width == w && frame.height == h) frame
+        else Bitmap.createScaledBitmap(frame, w, h, true)
+        if (scaled !== frame && !frame.isRecycled) frame.recycle()
+        return if (scaled.config == Bitmap.Config.ARGB_8888) scaled
+        else scaled.copy(Bitmap.Config.ARGB_8888, false)
     }
 
     /** A 16:9 thumbnail for pickers and the phone page. Call off the main thread. */
@@ -310,7 +406,18 @@ object Wallpapers {
             }
             backdrop = bmp?.asImageBitmap()
             frosted = frost?.asImageBitmap()
-            if (key != null && bmp != null && frost != null) saveBaked(key, bmp, frost)
+            // A gradient standing in for a video whose first frame would not decode is not
+            // baked: it would outlive the decoder's bad day, its key unchanged (1.5.3 showed
+            // the gradient for good once it had been baked). The next start tries again.
+            if (wp?.kind == WallpaperKind.Video && videoFrameFailed) {
+                bakedKey = null
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        runCatching { bakedDir.listFiles()?.forEach { it.delete() } }
+                            .onFailure { Log.w(TAG, "could not clear the baked backdrop", it) }
+                    }
+                }
+            } else if (key != null && bmp != null && frost != null) saveBaked(key, bmp, frost)
         }
     }
 

@@ -48,8 +48,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.layer.drawLayer
@@ -107,6 +105,15 @@ private val PlateMarginBottom = 30.dp
 
 /** How much taller the glass plate grows to hold the top row's names, with the second row kept clear of it. */
 private val PlateNameRoom = 28.dp
+
+/**
+ * The status pill's band at the top of the screen, and how far below it rows that scroll up
+ * fade out. The pill itself is the home screen's own: in the all-apps view it is gone, and
+ * with it the band, so the rows run to the top of the screen there.
+ */
+private val PillTop = 28.dp
+private val PillBottom = 62.dp
+private val PillFade = 40.dp
 
 /** Grid geometry for the screen at hand. On a 1080p TV this is a 960×540 dp canvas. */
 private class GridMetrics(screenW: Dp, screenH: Dp, oneRow: Boolean, val nameRoom: Dp, plateNames: Boolean, peek: Boolean, plate: Boolean) {
@@ -195,8 +202,7 @@ fun HomeScreen(
 
     var focusedKey by remember { mutableStateOf<String?>(null) }
     // The all-apps view. It opens once focus walks down into the grid (Down from the top row, or
-    // a drag into it) and stays open while focus moves up through the grid's own first row: Up
-    // stops there. Only Back — or the Home key — takes you out of it, back to the top row.
+    // a drag into it). Up from the grid's first row closes it again, as Back and the Home key do.
     var gridMode by remember { mutableStateOf(false) }
     // Where focus goes when the overlay closes, when that is not the tile it was on. Kept apart
     // from focusedKey: a closing menu hands focus to whatever tile lies under it first.
@@ -346,8 +352,8 @@ fun HomeScreen(
 
     BackHandler(enabled = overlay == Overlay.None && moving == null) {
         // tvOS: Back from inside the grid returns to the top row; Back on the top row starts the
-        // screensaver. A grid scrolled by touch counts as being inside it. Up never leaves the
-        // all-apps view — its first row is part of the grid — so Back is the way home.
+        // screensaver. A grid scrolled by touch counts as being inside it. Up from the grid's
+        // first row goes home too, so Back is not the only way out.
         val scrolled = dragged && scroll.value > 1f
         dragged = false
         // Handled even when that is turned off: unhandled, Back would close Home itself.
@@ -448,6 +454,12 @@ fun HomeScreen(
             if (ccOpen) 1f else 0f,
             tween(320, easing = Motion.EaseOut), label = "backdrop-veil",
         )
+        // The status pill is the home screen's own: in the all-apps view the top of the screen
+        // belongs to the rows, so the pill goes — and the time and Control Center with it.
+        val pillShown by animateFloatAsState(
+            if (gridMode || ccOpen) 0f else 1f,
+            tween(220, easing = Motion.EaseOut), label = "pill",
+        )
         // With Control Center open, Home is still: once the panel is in, a picture of it stands in
         // for it, one full-screen image a frame instead of every tile again under the panel
         // (MiTV-MFTR0: GPU 18-21 ms a frame drawing Home under it, as against 9-15 ms frosted).
@@ -531,6 +543,9 @@ fun HomeScreen(
                 collapse = collapsePx,
                 cover = { filmCover.value },
                 filmThroughGrid = Wallpapers.videoSelected,
+                // The picture itself behind the rows in the all-apps view, as the video
+                // wallpaper's film is: nothing blurred, nothing darkened, one draw.
+                sharpGrid = true,
                 filmStopped = { filmStopped },
                 toSaver = { toSaver.value },
                 saverImage = saverImage,
@@ -626,22 +641,31 @@ fun HomeScreen(
                                     } else Modifier,
                                 )
                                 // Into the screensaver, the apps go left to right, sinking a little.
+                                // A row scrolling up under the status pill fades out where it passes
+                                // it: a black scrim used to be drawn over the band, which read as a
+                                // black stripe once the all-apps view's background turned transparent.
                                 .graphicsLayer {
                                     val f = ((toSaver.value - 0.05f * (index % COLUMNS)) / 0.6f).coerceIn(0f, 1f)
-                                    if (f > 0f) {
-                                        alpha = 1f - f
-                                        translationY = f * 18.dp.toPx()
+                                    val top = slotPx.y - scroll.value
+                                    val band = (PillBottom + PillFade).toPx()
+                                    val under = ((band - top) / (band - PillTop.toPx())).coerceIn(0f, 1f)
+                                    val a = (1f - f) * (1f - under * pillShown)
+                                    if (f > 0f || a < 0.999f) {
+                                        alpha = a
+                                        // No offscreen buffer: it would clip the focus frame to the tile.
                                         compositingStrategy = CompositingStrategy.ModulateAlpha
                                     }
+                                    if (f > 0f) translationY = f * 18.dp.toPx()
                                 },
                             rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
-                            // In the all-apps view the first row is the grid's top row: Up stops
-                            // there (Back is the way out), so the pill stays out of reach below it.
-                            upBlocked = gridMode && index < COLUMNS,
+                            // Up from the all-apps view's first row goes home: back to the top
+                            // row, where this very tile sits, so focus stays.
+                            leaveGrid = if (gridMode && index < COLUMNS) { { gridMode = false } } else null,
                             // On the glass plate only with every name shown (an earlier build showed
-                            // the focused one alone there, but it sat oddly on the glass).
-                            showName = plate == null || index >= COLUMNS || plateNames,
-                            nameOnPlate = plate != null && index < COLUMNS,
+                            // the focused one alone there, but it sat oddly on the glass). In the
+                            // all-apps view the first row shows its names like every other row.
+                            showName = plate == null || index >= COLUMNS || plateNames || gridMode,
+                            nameOnPlate = plate != null && index < COLUMNS && !gridMode,
                         )
                     }
                 }
@@ -651,16 +675,6 @@ fun HomeScreen(
         homeShot?.let { shot -> Canvas(Modifier.fillMaxSize()) { drawImage(shot) } }
         PanelBackdrop(Wallpapers.frosted.takeIf { Wallpapers.backdrop != null }, { backdropFrost }, { backdropVeil })
 
-        // Rows that scroll up under the status pill fade out instead of colliding with it.
-        Canvas(
-            Modifier
-                .fillMaxWidth()
-                .height(120.dp)
-                .graphicsLayer { alpha = (scroll.value / collapsePx).coerceIn(0f, 1f) },
-        ) {
-            drawRect(Brush.verticalGradient(0f to Color.Black, 0.5f to Color.Black.copy(alpha = 0.82f), 1f to Color.Transparent))
-        }
-
         // The pill holds only the network and Control Center. The time joins it once the clock
         // above the top row has scrolled away, so the screen never shows the time twice. The small
         // clock on the right puts the time and weather just left of the pill.
@@ -668,7 +682,9 @@ fun HomeScreen(
             Modifier
                 .align(Alignment.TopEnd)
                 .padding(top = 28.dp, end = metrics.margin - 14.dp)
-                .graphicsLayer { alpha = if (overlay is Overlay.ControlCenter) 0f else 1f },
+                // Gone in the all-apps view (and while Control Center is open), where the top of
+                // the screen belongs to the rows: the WiFi, time and switches stay Home's own.
+                .graphicsLayer { alpha = pillShown },
             verticalAlignment = Alignment.CenterVertically,
         ) {
             if (!AerialSettings.largeClock && AerialSettings.clockRight) {
@@ -684,7 +700,8 @@ fun HomeScreen(
                 now = now,
                 network = vm.network,
                 showTime = pastShelf || focusedRow > 0,
-                enabled = gridEnabled && moving == null,
+                // Out of reach in the all-apps view: Up from its first row goes home instead.
+                enabled = gridEnabled && moving == null && !gridMode,
                 focusRequester = pillRequester,
                 modifier = Modifier.graphicsLayer {
                     alpha = 1f - (toSaver.value * 2f).coerceIn(0f, 1f)
