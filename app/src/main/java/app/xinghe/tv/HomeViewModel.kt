@@ -49,6 +49,8 @@ sealed interface Overlay {
     data class Folder(val id: String) : Overlay
     data object HiddenApps : Overlay
     data object Wallpaper : Overlay
+    /** The owner's uploaded videos, as a folder under the wallpaper sheet: pick one, it stays. */
+    data object Videos : Overlay
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
 }
 

@@ -137,8 +137,9 @@ fun LiveWallpaper(
         idle = false
         if (!moving) return@LaunchedEffect
         // The video wallpaper moves as soon as Home shows it: no still wait, and keys do not stop
-        // it — only leaving the top row, an overlay, an app or the screensaver does.
-        if (Wallpapers.selectedId == Wallpapers.VIDEO) { idle = true; return@LaunchedEffect }
+        // it — it keeps playing through the all-apps view, whose background is transparent — only
+        // an overlay, an app or the screensaver does.
+        if (Wallpapers.videoSelected) { idle = true; return@LaunchedEffect }
         delay(START_AFTER_MS)
         idle = true
     }
@@ -157,14 +158,15 @@ fun LiveWallpaper(
         showing = false
     }
 
-    /** The owner's uploaded videos (ScreensaverVideos), local files, looping muted behind Home. */
+    /** The owner's chosen video (ScreensaverVideos): one local file, looping muted behind Home. */
     fun openLocal(): ExoPlayer {
         val videos = ScreensaverVideos.all(context)
-        DiagLog.i("video wallpaper: ${videos.size} video(s) on hand")
-        // Where the picture on screen came from one of them, pick up there; else the first in line.
+        // The chosen one, on its own: no taking turns. Where its picture came from, pick up there.
         val spot = Wallpapers.liveSpot()
-        val resume = spot?.let { (id, _) -> videos.firstOrNull { "local:${it.id}" == id } }
-        val films = if (resume != null) listOf(resume) + (videos - resume) else videos
+        val chosen = Wallpapers.selectedVideoId?.let { id -> videos.firstOrNull { it.id == id } }
+            ?: videos.firstOrNull { "local:${it.id}" == spot?.first }
+            ?: videos.firstOrNull()
+        DiagLog.i("video wallpaper: ${chosen?.name ?: "no video on hand"}")
         var failures = 0
         return ExoPlayer.Builder(context).build().apply {
             volume = 0f
@@ -182,17 +184,17 @@ fun LiveWallpaper(
 
                 override fun onPlayerError(error: PlaybackException) {
                     DiagLog.i("video wallpaper failed (${error.errorCodeName})")
-                    // Three in a row: nothing playable; the picture stays as it is.
+                    // Three in a row: the file is unreadable; the picture stays as it is.
                     if (++failures >= 3) return
-                    seekToNextMediaItem()
                     prepare()
                 }
             })
-            if (films.isNotEmpty()) {
+            if (chosen != null) {
+                val at = if ("local:${chosen.id}" == spot?.first) spot.second else 0L
                 setMediaItems(
-                    films.map { MediaItem.Builder().setUri(Uri.fromFile(it.file)).setMediaId("local:${it.id}").build() },
+                    listOf(MediaItem.Builder().setUri(Uri.fromFile(chosen.file)).setMediaId("local:${chosen.id}").build()),
                     0,
-                    if (resume != null) spot?.second ?: 0L else 0L,
+                    at,
                 )
                 surface?.let { setVideoSurfaceView(it) }
                 prepare()
@@ -245,7 +247,7 @@ fun LiveWallpaper(
 
     fun open(): ExoPlayer {
         openedFor = Wallpapers.selectedId
-        return if (Wallpapers.selectedId == Wallpapers.VIDEO) openLocal() else openAerial()
+        return if (Wallpapers.videoSelected) openLocal() else openAerial()
     }
 
     // The film on screen, opened ahead for its frames (see FrameReader), and a small key frame
@@ -291,7 +293,7 @@ fun LiveWallpaper(
             }
             p.pause()
             if (cover.value > 0f) {
-                if (Wallpapers.selectedId == Wallpapers.VIDEO) {
+                if (Wallpapers.videoSelected) {
                     // The video wallpaper never bakes a stopped frame: no PixelCopy, no decode, no
                     // disk writes while the viewer is moving around (that read as dropped frames).
                     // The still picture fades in over the paused frame, and the film goes on from

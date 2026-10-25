@@ -86,7 +86,11 @@
     <string name="wx_thunder">雷雨</string>
     <string name="wp_daily_latest">每日一图</string>
     <string name="wp_live">动态航拍。在主屏幕第一行停 10 秒后开始播放，按任意键停在当前画面并留作壁纸，下次从这一帧接着播。</string>
-    <string name="wp_video">把从手机上传的视频作为动态壁纸。在主屏幕第一行停 10 秒后开始播放，按任意键停在当前画面并留作壁纸，下一个视频从这一帧接着播。视频在屏保页上传。</string>
+    <string name="wp_video_title">动态壁纸</string>
+    <string name="wp_video">把从手机上传的视频作为动态壁纸，在主页和全部应用页一直播放。按 OK 打开文件夹选择，选定后不再轮播。</string>
+    <string name="videos_title">动态壁纸</string>
+    <string name="videos_hint">选择一个视频作为动态壁纸，选定后一直播放，不再轮播。</string>
+    <string name="videos_empty">还没有上传视频。在屏保页扫码，即可从手机上传。</string>
     <string name="wp_photos_rotate">我的照片 · 每天换</string>
     <string name="wp_daily_note">必应每日一图，每天自动换成当天的。</string>
     <string name="wp_photos_rotate_note">从你的照片里每天换一张。</string>

@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -101,6 +102,8 @@ fun WallpaperSheet(
     onHiddenApps: () -> Unit,
     onStartScreensaver: () -> Unit,
     onPin: (on: Boolean) -> Unit,
+    /** The uploaded videos, as a folder: the wallpaper row's video card opens it. */
+    onOpenVideos: () -> Unit,
 ) {
     val context = LocalContext.current
     var phoneUrl by remember { mutableStateOf<String?>(null) }
@@ -152,7 +155,7 @@ fun WallpaperSheet(
                     BasicText(stringResource(R.string.wp_title), style = Type.LargeTitle)
                     Spacer(Modifier.height(16.dp))
                     SectionTitle(R.string.wp_wallpaper)
-                    WallpaperRows()
+                    WallpaperRows(onOpenVideos)
 
                     Spacer(Modifier.height(6.dp))
                     SectionTitle(R.string.st_home_layout)
@@ -282,13 +285,85 @@ fun WallpaperSheet(
 }
 
 /**
- * Every wallpaper in one row, in the order most people want them: the moving aerial, Bing's photo
- * of the day, the owner's own photos, then a few of the built-in pictures and "Follow App". Past
- * daily photos and the rest of the built-ins are left out unless one of them is the current
- * choice. The focused card's note is under the row, as under a group of settings.
+ * The owner's uploaded videos, as a folder under the wallpaper sheet: one card per video, the
+ * chosen one checked. Pick one and it is the wallpaper from then on — it plays behind Home and
+ * behind the all-apps view, and never takes turns with the others. Back returns to the sheet.
  */
 @Composable
-private fun WallpaperRows() {
+fun VideosSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val videos = Wallpapers.items.filter { it.kind == WallpaperKind.Video }
+    val first = remember { FocusRequester() }
+    BackHandler(enabled = visible, onBack = onDismiss)
+    LaunchedEffect(visible, videos.size) {
+        if (visible) {
+            withFrameNanos { }
+            runCatching { first.requestFocus() }
+        }
+    }
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(220)), exit = fadeOut(tween(180)), modifier = Modifier.fillMaxSize()) {
+        // A tap outside the folder closes it, back to the wallpaper sheet as Back does.
+        Box(Modifier.fillMaxSize().dismissOnTap(onDismiss).background(Color.Black.copy(alpha = 0.25f)))
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(200)) + slideInVertically(tween(380, easing = Motion.Drawer)) { it / 3 },
+            exit = fadeOut(tween(160)) + slideOutVertically(tween(200, easing = Motion.EaseOut)) { it / 4 },
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp)
+                    .consumeTaps()
+                    // The same glass as the sheet it opens from, one drawer higher.
+                    .liquidGlass(30.dp, bottomCorners = false)
+                    .padding(start = 40.dp, end = 32.dp, top = 24.dp, bottom = 24.dp),
+            ) {
+                BasicText(stringResource(R.string.videos_title), style = Type.LargeTitle)
+                BasicText(
+                    stringResource(if (videos.isEmpty()) R.string.videos_empty else R.string.videos_hint),
+                    style = Type.Callout, modifier = Modifier.padding(top = 4.dp, bottom = 16.dp),
+                )
+                // Three cards to a row; past three rows the folder scrolls inside itself.
+                Column(
+                    Modifier
+                        .weight(1f, fill = false)
+                        .verticalScroll(rememberScrollState())
+                        // Room for the focused card's 1.08x scale, so the edge rows are not clipped.
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                ) {
+                    videos.chunked(3).forEachIndexed { r, row ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(20.dp), modifier = Modifier.padding(bottom = 18.dp)) {
+                            row.forEachIndexed { c, wp ->
+                                WallpaperCard(
+                                    wp,
+                                    if (r == 0 && c == 0) first else null,
+                                    onFocused = {},
+                                    // Picking one sets it and closes the folder: Home above the
+                                    // sheet is already the new film.
+                                    onClick = { Wallpapers.select(wp.id); onDismiss() },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Every wallpaper in one row, in the order most people want them: the moving aerial, the owner's
+ * uploaded videos as one folder card, Bing's photo of the day, the owner's own photos, then a few
+ * of the built-in pictures and "Follow App". Past daily photos and the rest of the built-ins are
+ * left out unless one of them is the current choice. The focused card's note is under the row, as
+ * under a group of settings.
+ */
+@Composable
+private fun WallpaperRows(onOpenVideos: () -> Unit) {
     val items = Wallpapers.items
     val selected = Wallpapers.selectedId
     val first = remember { FocusRequester() }
@@ -298,10 +373,16 @@ private fun WallpaperRows() {
     }
     val dailyTitle = stringResource(R.string.wp_daily_latest)
     val rotateTitle = stringResource(R.string.wp_photos_rotate)
-    val list = remember(items, selected, dailyTitle, rotateTitle) {
+    val videoTitle = stringResource(R.string.wp_video_title)
+    val list = remember(items, selected, dailyTitle, rotateTitle, videoTitle) {
         buildList {
             addAll(items.filter { it.kind == WallpaperKind.Live })
-            addAll(items.filter { it.kind == WallpaperKind.Video })
+            // The uploaded videos are a folder, not a row of cards: one card opens it, titled
+            // after the kind. Its picture is the chosen video's frame (or the first one's), and
+            // a check shows when a video is the wallpaper.
+            (items.firstOrNull { it.kind == WallpaperKind.Video && it.id == selected }
+                ?: items.firstOrNull { it.kind == WallpaperKind.Video })
+                ?.let { add(it.copy(title = videoTitle)) }
             if (items.any { it.kind == WallpaperKind.Daily }) add(Wallpaper(Wallpapers.LATEST_DAILY, WallpaperKind.Daily, dailyTitle))
             addAll(items.filter { it.kind == WallpaperKind.Daily && it.id == selected })
             val photos = items.filter { it.kind == WallpaperKind.Photo }
@@ -322,7 +403,15 @@ private fun WallpaperRows() {
     ) {
         items(list, key = { it.id }) { wp ->
             val hint = wallpaperNote(wp)
-            WallpaperCard(wp, if (wp === list.first()) first else null, onFocused = { note = hint })
+            WallpaperCard(
+                wp,
+                if (wp === list.first()) first else null,
+                onFocused = { note = hint },
+                // The folder card opens the videos rather than choosing one here.
+                onClick = {
+                    if (wp.kind == WallpaperKind.Video) onOpenVideos() else Wallpapers.select(wp.id)
+                },
+            )
         }
     }
     Box(Modifier.height(42.dp).padding(start = 4.dp, top = 8.dp)) {
@@ -344,12 +433,18 @@ private fun wallpaperNote(wp: Wallpaper): String? = when {
 }
 
 @Composable
-private fun WallpaperCard(wp: Wallpaper, focusRequester: FocusRequester?, onFocused: () -> Unit) {
+private fun WallpaperCard(
+    wp: Wallpaper,
+    focusRequester: FocusRequester?,
+    onFocused: () -> Unit,
+    /** What OK does: choose this wallpaper, or — for the videos folder — open it. */
+    onClick: () -> Unit = { Wallpapers.select(wp.id) },
+) {
     val selected = Wallpapers.selectedId == wp.id
     val thumb by produceState<ImageBitmap?>(null, wp.id, Wallpapers.items) {
         value = withContext(Dispatchers.Default) { Wallpapers.thumbnail(wp.id)?.asImageBitmap() }
     }
-    Pressable(onClick = { Wallpapers.select(wp.id) }, focusRequester = focusRequester, focusedScale = 1.08f) { state ->
+    Pressable(onClick = onClick, focusRequester = focusRequester, focusedScale = 1.08f) { state ->
         LaunchedEffect(state.focused) { if (state.focused) onFocused() }
         Column(Modifier.width(168.dp)) {
             Box(

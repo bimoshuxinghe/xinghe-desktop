@@ -87,7 +87,11 @@
     <string name="wx_thunder">Thunderstorm</string>
     <string name="wp_daily_latest">Daily Photo</string>
     <string name="wp_live">Moving aerial films. They start after 10 seconds still on the top row of Home and stop on the frame showing at any key, which stays as the picture; the next film picks up from there.</string>
-    <string name="wp_video">Your uploaded videos play behind Home. They start after 10 seconds still on the top row and stop on the frame showing at any key, which stays as the picture; the next video picks up from there. Upload videos on the screensaver page.</string>
+    <string name="wp_video_title">Video Wallpaper</string>
+    <string name="wp_video">Your uploaded videos play behind Home, through the all-apps view as well. Press OK to open the folder and pick one: it plays from then on, no taking turns.</string>
+    <string name="videos_title">Video Wallpaper</string>
+    <string name="videos_hint">Pick one video as the wallpaper: it plays from then on, no taking turns.</string>
+    <string name="videos_empty">No videos uploaded yet. Scan the code on the screensaver page to send one from your phone.</string>
     <string name="wp_photos_rotate">My Photos, Daily</string>
     <string name="wp_daily_note">Bing\'s photo of the day, changing to the new one every day.</string>
     <string name="wp_photos_rotate_note">A different one of your photos each day.</string>

@@ -74,6 +74,7 @@ import app.xinghe.tv.R
 import app.xinghe.tv.settings.AerialSettings
 import app.xinghe.tv.apps.AppEntry
 import app.xinghe.tv.ui.control.ControlCenter
+import app.xinghe.tv.ui.wallpaper.VideosSheet
 import app.xinghe.tv.ui.wallpaper.WallpaperSheet
 import app.xinghe.tv.wallpaper.ScreensaverMode
 import app.xinghe.tv.wallpaper.Wallpapers
@@ -505,12 +506,14 @@ fun HomeScreen(
                     (metrics.topRowY + metrics.tileH + PlatePadV + metrics.firstGap).toPx(),
                 )
             }
-            // The moving wallpaper's film (aerial films, or the owner's videos), under everything;
-            // it moves only on a still top row.
-            if (Wallpapers.selectedId == Wallpapers.LIVE || Wallpapers.selectedId == Wallpapers.VIDEO) {
+            // The moving wallpaper's film (aerial films, or the owner's videos), under everything.
+            if (Wallpapers.selectedId == Wallpapers.LIVE || Wallpapers.videoSelected) {
                 LiveWallpaper(
-                    moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && !pastShelf &&
-                        focusedRow == 0 && moving == null,
+                    // The video wallpaper keeps playing through the all-apps view: the grid's
+                    // background is transparent there, the film showing behind the rows. The
+                    // aerial films stop on a keypress, on the top row only, as before.
+                    moving = vm.resumed && overlay == Overlay.None && !vm.screensaverVisible && moving == null &&
+                        (Wallpapers.videoSelected || (!pastShelf && focusedRow == 0)),
                     keep = vm.resumed && (!vm.screensaverVisible || filmSaver),
                     lastInputAt = vm.lastInputAt,
                     cover = filmCover,
@@ -527,6 +530,7 @@ fun HomeScreen(
                 scroll = { scroll.value },
                 collapse = collapsePx,
                 cover = { filmCover.value },
+                filmThroughGrid = Wallpapers.videoSelected,
                 filmStopped = { filmStopped },
                 toSaver = { toSaver.value },
                 saverImage = saverImage,
@@ -827,6 +831,13 @@ fun HomeScreen(
                 if (on) vm.overlay = Overlay.Pin(PinMode.Create) { vm.overlay = Overlay.Wallpaper }
                 else vm.whenUnlocked { AerialSettings.choosePin(null); vm.overlay = Overlay.Wallpaper }
             },
+            onOpenVideos = { vm.overlay = Overlay.Videos },
+        )
+
+        // The uploaded videos, a folder out of the wallpaper sheet; Back returns there.
+        VideosSheet(
+            visible = overlay is Overlay.Videos,
+            onDismiss = { vm.overlay = Overlay.Wallpaper },
         )
 
         val pin = overlay as? Overlay.Pin

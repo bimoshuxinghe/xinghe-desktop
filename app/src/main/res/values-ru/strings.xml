@@ -79,7 +79,11 @@
     <string name="wx_thunder">Гроза</string>
     <string name="wp_daily_latest">Всегда сегодняшнее</string>
     <string name="wp_live">Аэросъёмка · запускается через 10 секунд на главном экране</string>
-    <string name="wp_video">Загруженные видео играются за главным экраном: через 10 секунд покоя показ начинается, любая клавиша останавливает кадр, который остаётся картинкой; следующий видео идёт оттуда.</string>
+    <string name="wp_video_title">Видеообои</string>
+    <string name="wp_video">Загруженные видео играют за главным экраном, в том числе в режиме всех приложений. Нажмите OK, чтобы открыть папку и выбрать одно: оно играет дальше само, без смены.</string>
+    <string name="videos_title">Видеообои</string>
+    <string name="videos_hint">Выберите одно видео для обоев: оно играет дальше само, без смены.</string>
+    <string name="videos_empty">Видео ещё не загружены. Отсканируйте код на странице заставки, чтобы отправить его с телефона.</string>
     <string name="wp_photos_rotate">Одно в день</string>
     <string name="wp_daily_note">Фото дня от Bing, каждый день новое.</string>
     <string name="wp_photos_rotate_note">Каждый день другое из ваших фото.</string>

@@ -61,6 +61,8 @@ enum class ScreensaverMode(val key: String) {
  * - Auto: the previous behaviour, light taken from the focused app's artwork.
  * - Live: Apple's aerial films, moving once Home has sat still a while (ui/home/LiveWallpaper.kt).
  *   Its picture is the frame the film last stopped on, so the glass and the grid match it.
+ * - Video: the owner's own uploaded films, one wallpaper each ("video:<id>"): the one picked plays
+ *   on its own, no taking turns. Picked in the folder the video wallpaper's card opens.
  *
  * State is Compose snapshot state, written on the main thread only.
  */
@@ -71,7 +73,15 @@ object Wallpapers {
     const val AUTO = "auto"
     const val ROTATE_PHOTOS = "photos:rotate"
     const val LIVE = "aerial:live"
-    const val VIDEO = "video:all"
+    /** The owner's uploaded videos: one wallpaper each, "video:<id>", fixed — no taking turns. */
+    const val VIDEO_PREFIX = "video:"
+    fun videoWallpaperId(videoId: String) = VIDEO_PREFIX + videoId
+    fun isVideoWallpaper(id: String) = id.startsWith(VIDEO_PREFIX)
+    /** The wallpaper is one of the owner's uploaded videos. */
+    val videoSelected: Boolean get() = isVideoWallpaper(selectedId)
+    /** Which uploaded video the wallpaper is, or null when it is not one of them. */
+    val selectedVideoId: String?
+        get() = selectedId.removePrefix(VIDEO_PREFIX).takeIf { isVideoWallpaper(selectedId) && it.isNotEmpty() }
     private const val FOLLOW = "follow"
     private const val DEFAULT_FALLBACK = "grad:aurora"
 
@@ -101,9 +111,9 @@ object Wallpapers {
      * from that picture. "Follow App", having no picture, carries the aerial films on.
      */
     val screensaver: ScreensaverMode
-        get() = chosenScreensaver ?: when (selectedId) {
-            LIVE, AUTO -> ScreensaverMode.Aerial
-            VIDEO -> ScreensaverMode.Videos
+        get() = chosenScreensaver ?: when {
+            selectedId == LIVE || selectedId == AUTO -> ScreensaverMode.Aerial
+            isVideoWallpaper(selectedId) -> ScreensaverMode.Videos
             else -> ScreensaverMode.Photos
         }
 
@@ -115,7 +125,8 @@ object Wallpapers {
 
     /**
      * The same picture frosted: blurred small and darkened. The glass under the top row samples it,
-     * and the whole screen turns to it once focus goes down into the grid, as on tvOS.
+     * and the whole screen turns to it once focus goes down into the grid, as on tvOS — except
+     * behind the video wallpaper's film, which keeps playing there (ui/home/HomeChrome.kt).
      */
     var frosted by mutableStateOf<ImageBitmap?>(null); private set
 
@@ -231,15 +242,26 @@ object Wallpapers {
         // Until a film has stopped on a frame, the first built-in stands in.
         WallpaperKind.Live -> liveFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
             ?: Gradients.render(Gradients.presets.first(), w, h)
-        // The video wallpaper's picture is the frame it last stopped on, else the first video's
-        // first frame.
-        WallpaperKind.Video -> videoFrame.takeIf { it.exists() }?.let { Images.decodeCover(it, w, h) }
-            ?: firstVideoFrame(w, h) ?: Gradients.render(Gradients.presets.first(), w, h)
+        // The video wallpaper's picture is the frame it last stopped on, else the chosen video's
+        // own first frame.
+        WallpaperKind.Video -> videoPicture(wp.id, w, h)
     }
 
-    /** The first frame of the first uploaded video, for the picture and the thumbnail. */
-    private fun firstVideoFrame(w: Int, h: Int): Bitmap? {
-        val video = ScreensaverVideos.all(app).firstOrNull() ?: return null
+    /**
+     * The picture of one of the owner's videos: the frame it last stopped on (when the film on
+     * screen came from this very video), else its first frame.
+     */
+    private fun videoPicture(id: String, w: Int, h: Int): Bitmap? {
+        val videoId = id.removePrefix(VIDEO_PREFIX)
+        if (liveSpot()?.first?.removePrefix("local:") == videoId) {
+            videoFrame.takeIf { it.exists() }?.let { return Images.decodeCover(it, w, h) }
+        }
+        val video = ScreensaverVideos.all(app).firstOrNull { it.id == videoId }
+        return video?.let { videoFirstFrame(it, w, h) } ?: Gradients.render(Gradients.presets.first(), w, h)
+    }
+
+    /** The first frame of one of the owner's videos, for its picture and its thumbnail. */
+    private fun videoFirstFrame(video: ScreensaverVideo, w: Int, h: Int): Bitmap? {
         val mmr = MediaMetadataRetriever()
         return try {
             mmr.setDataSource(video.file.absolutePath)
@@ -250,7 +272,7 @@ object Wallpapers {
                 if (sized.isMutable && sized.config == Bitmap.Config.ARGB_8888) sized else sized.copy(Bitmap.Config.ARGB_8888, true)
             }
         } catch (e: Exception) {
-            Log.w(TAG, "could not decode the video wallpaper's frame", e)
+            Log.w(TAG, "could not decode a video's frame", e)
             null
         } finally {
             runCatching { mmr.release() }
@@ -373,11 +395,11 @@ object Wallpapers {
      * It was [atMs] into [film], where the film picks up when it next moves ([liveSpot]).
      */
     suspend fun useLiveFrame(frame: Bitmap, film: String, atMs: Long) {
-        if (selectedId != LIVE && selectedId != VIDEO) return
+        if (selectedId != LIVE && !videoSelected) return
         backdropJob?.cancel()
         prefs.edit { putString("live_film", film).putLong("live_at", atMs) }
         // Each kind keeps its stopped frame in its own file: the cards' thumbnails read them.
-        val frameFile = if (selectedId == VIDEO) videoFrame else liveFrame
+        val frameFile = if (videoSelected) videoFrame else liveFrame
         val (bmp, frost) = withContext(Dispatchers.Default) {
             runCatching { frameFile.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) } }
                 .onFailure { Log.w(TAG, "could not keep the film's frame", it) }
@@ -385,7 +407,7 @@ object Wallpapers {
             val frost = Images.frost(frame)
             Images.shadeForHome(frame) to frost
         }
-        synchronized(thumbs) { thumbs.remove(LIVE); thumbs.remove(VIDEO) }
+        synchronized(thumbs) { thumbs.remove(LIVE); thumbs.remove(selectedId) }
         backdrop = bmp.asImageBitmap()
         frosted = frost.asImageBitmap()
         resolve(selectedId)?.let { saveBaked(bakedKey(it), bmp, frost) }
@@ -406,14 +428,14 @@ object Wallpapers {
      * [useLiveFrame]. [frame] is used up.
      */
     suspend fun useLiveFrost(frame: Bitmap) {
-        if (selectedId != LIVE && selectedId != VIDEO) return
+        if (selectedId != LIVE && !videoSelected) return
         backdropJob?.cancel()
         frosted = withContext(Dispatchers.Default) { Images.frost(frame) }.asImageBitmap()
     }
 
     /** Puts back the glass from before [useLiveFrost] when the exact frame could not be had. */
     fun restoreFrost(before: ImageBitmap?) {
-        if ((selectedId == LIVE || selectedId == VIDEO) && before != null) frosted = before
+        if ((selectedId == LIVE || videoSelected) && before != null) frosted = before
     }
 
     private fun rebuildList() {
@@ -425,11 +447,12 @@ object Wallpapers {
             .map { Wallpaper("photo:${it.nameWithoutExtension}", WallpaperKind.Photo, if (zh) "我的照片" else "My Photo") }
         val auto = Wallpaper(AUTO, WallpaperKind.Auto, if (zh) "跟随 App" else "Follow App")
         val live = Wallpaper(LIVE, WallpaperKind.Live, if (zh) "航拍" else "Aerial")
-        // The video wallpaper exists only while there is something to play; the list is rebuilt
-        // when videos are added or removed (refreshVideos).
-        val video = if (ScreensaverVideos.all(app).isEmpty()) null
-            else Wallpaper(VIDEO, WallpaperKind.Video, if (zh) "视频壁纸" else "Video")
-        items = listOfNotNull(live, video) + daily + builtins + photos + auto
+        // One wallpaper per uploaded video, each titled with the video's name: the folder the
+        // video wallpaper's card opens lists them, and picking one fixes it. They exist only
+        // while there is something to play; the list is rebuilt when videos change (refreshVideos).
+        val videos = ScreensaverVideos.all(app)
+            .map { Wallpaper(videoWallpaperId(it.id), WallpaperKind.Video, it.name) }
+        items = listOfNotNull(live) + videos + daily + builtins + photos + auto
     }
 
     /**
@@ -442,11 +465,14 @@ object Wallpapers {
             val videos = ScreensaverVideos.all(app)
             scope.launch(Dispatchers.Main) {
                 val listed = items.any { it.kind == WallpaperKind.Video }
-                if (videos.isNotEmpty() != listed) {
+                val chosenGone = videoSelected && videos.none { videoWallpaperId(it.id) == selectedId }
+                if (videos.isNotEmpty() != listed || chosenGone) {
                     rebuildList()
-                    if (selectedId == VIDEO && videos.isEmpty()) select(LATEST_DAILY)
-                    if (selectedId == VIDEO) rebuildBackdrop()
-                } else if (selectedId == VIDEO) {
+                    if (chosenGone) {
+                        // The video that was chosen went: the first of those left, or the daily photo.
+                        select(videos.firstOrNull()?.let { videoWallpaperId(it.id) } ?: LATEST_DAILY)
+                    } else if (videoSelected) rebuildBackdrop()
+                } else if (videoSelected) {
                     // The set changed without the card going: the baked picture may be stale.
                     rebuildBackdrop()
                 }

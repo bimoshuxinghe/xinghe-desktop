@@ -79,7 +79,11 @@
     <string name="wx_thunder">Нөсер</string>
     <string name="wp_daily_latest">Әрқашан бүгінгісі</string>
     <string name="wp_live">Аэрожиын · басты экранда 10 секундтан кейін ойнайды</string>
-    <string name="wp_video">Жүктелген бейнерлер басты экранның артында ойналады: 10 секунд тыныштықтан кейін көрсету басталады, кез келген перне кадрды тоқтатады, ол сурет болып қалады; келесі бейнер сонан басталады.</string>
+    <string name="wp_video_title">Бейне тұсқағаз</string>
+    <string name="wp_video">Жүктелген бейнерлер басты экранның артында, барлық қолданбалар көрінісінде де ойнайды. Қалтаны ашу үшін OK басыңыз, біреуін таңдаңыз: ол өзі ойнай береді, ауыспайды.</string>
+    <string name="videos_title">Бейне тұсқағаз</string>
+    <string name="videos_hint">Тұсқағаз ретінде бір бейне таңдаңыз: ол өзі ойнай береді, ауыспайды.</string>
+    <string name="videos_empty">Әзірге бейне жүктелмеген. Телефоннан жіберу үшін заставка бетіндегі кодты сканерлеңіз.</string>
     <string name="wp_photos_rotate">Күніне біреуі</string>
     <string name="wp_daily_note">Bing күн суреті, күн сайын жаңасына ауысады.</string>
     <string name="wp_photos_rotate_note">Күн сайын фотоларыңыздың басқасы.</string>

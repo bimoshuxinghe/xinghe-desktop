@@ -166,7 +166,9 @@ fun dateText(now: LocalDateTime): String {
  * whole screen turns to the picture frosted and darker, so the rows read over anything.
  *
  * Everything follows [scroll] (the grid's scroll, [collapse] being where the grid has fully come
- * in), so the change is exactly as fast as the movement that causes it. Nothing is blurred live:
+ * in), so the change is exactly as fast as the movement that causes it. With the owner's video
+ * wallpaper the grid is transparent instead ([filmThroughGrid]): the film keeps playing behind
+ * the rows. Nothing is blurred live:
  * the frosted copy is baked small ahead of time (Images.frost) and darkened here once, and the
  * plate shows the part of that frosted copy that lies under it, stretched over the screen through
  * a shader. At rest a frame is one full-screen draw (plus the plate in the top row); both pictures
@@ -182,6 +184,13 @@ fun HomeBackground(
     collapse: Float,
     /** How far the aerial wallpaper's film shows through (LiveWallpaper): picture and plate give way to it. */
     cover: () -> Float = { 0f },
+    /**
+     * The film shows through the whole screen, the grid included: the owner's video wallpaper
+     * keeps playing behind the all-apps view, whose background is transparent rather than the
+     * picture frosted and darkened. The aerial films keep the grid frosted, where a film stops
+     * on a keypress and its frame stands in for the picture.
+     */
+    filmThroughGrid: Boolean = false,
     /**
      * How far the film is stopped (0 to 1) with its glass ready ([frosted]) but its frame not yet
      * the picture, which takes a moment more where the frame is decoded again (Xiaomi
@@ -206,7 +215,7 @@ fun HomeBackground(
             drawRect(Brush.verticalGradient(*Images.SHADE_AT.indices.map { Images.SHADE_AT[it] to Color.Black.copy(alpha = Images.SHADE[it]) }.toTypedArray()), alpha = stopped)
             drawRect(Brush.horizontalGradient(0f to Color.Black.copy(alpha = Images.SHADE_LEFT), 1f to Color.Transparent, endX = size.width / 2), alpha = stopped)
         }
-        Pictures(backdrop, frosted, scroll, collapse, cover)
+        Pictures(backdrop, frosted, scroll, collapse, cover, filmThroughGrid)
         if (saverImage != null) Canvas(Modifier.fillMaxSize()) {
             val a = saverReveal()
             if (a > 0.01f) drawDrawingIn(saverImage, saverPush(), a)
@@ -217,7 +226,7 @@ fun HomeBackground(
 
 /** The sharp picture and the grid's frosted one, crossfading when the wallpaper changes. */
 @Composable
-private fun Pictures(backdrop: ImageBitmap?, frosted: ImageBitmap?, scroll: () -> Float, collapse: Float, cover: () -> Float) {
+private fun Pictures(backdrop: ImageBitmap?, frosted: ImageBitmap?, scroll: () -> Float, collapse: Float, cover: () -> Float, filmThroughGrid: Boolean = false) {
     Crossfade(
         targetState = backdrop to frosted,
         animationSpec = tween(450, easing = Motion.EaseOut),
@@ -231,7 +240,9 @@ private fun Pictures(backdrop: ImageBitmap?, frosted: ImageBitmap?, scroll: () -
         Canvas(Modifier.fillMaxSize()) {
             val film = cover()
             // On the top row, the film alone through the window: nothing of Compose's full-screen.
-            if (film > 0.99f && scroll() < collapse * 0.3f) return@Canvas
+            // The owner's video wallpaper plays behind the all-apps view the same way: its
+            // background is transparent, the film showing through behind the rows.
+            if (film > 0.99f && (scroll() < collapse * 0.3f || filmThroughGrid)) return@Canvas
             if (bmp == null || dark == null) {
                 drawRect(Color.Black)
                 return@Canvas
