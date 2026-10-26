@@ -199,6 +199,10 @@
     <string name="pin_arrows_hint">Натисніть клавіші зі стрілками чотири рази: вгору, вниз, ліворуч або праворуч.</string>
     <string name="pin_arrows_create_hint">Натисніть клавіші зі стрілками чотири рази. Збережіть порядок у надійному місці: якщо його забуто, скинути його можна лише з комп’ютера через ADB.</string>
     <string name="weather_clear">Ясно</string>
+    <string name="weather_week">Погода на тиждень</string>
+    <string name="weather_today">Сьогодні</string>
+    <string name="weather_tomorrow">Завтра</string>
+    <string name="weather_none">Прогноз ще недоступний</string>
     <string name="weather_partly_cloudy">Мінлива хмарність</string>
     <string name="weather_cloudy">Хмарно</string>
     <string name="weather_fog">Туман</string>

@@ -27,6 +27,15 @@ enum class WeatherKind { Clear, PartlyCloudy, Cloudy, Fog, Rain, Snow, Thunder }
 data class WeatherNow(val celsius: Int, val kind: WeatherKind, val day: Boolean, val high: Int? = null, val low: Int? = null)
 
 /**
+ * One day of the forecast, [date] as Open-Meteo names it (yyyy-MM-dd), for a week from today.
+ * Shown when the clock or the weather is pressed.
+ */
+data class WeatherDay(val date: String, val kind: WeatherKind, val high: Int?, val low: Int?)
+
+/** How many days the forecast panel shows. */
+const val FORECAST_DAYS = 7
+
+/**
  * The weather beside the home clock, from Open-Meteo: no key, reachable from China. The place is
  * the one the owner names on the phone page, or else a guess from the network's public address.
  * The guess is often wrong behind a proxy (a whole home behind one shows another country), which
@@ -47,6 +56,9 @@ object Weather {
     private const val NONE = Int.MIN_VALUE
 
     var now by mutableStateOf<WeatherNow?>(null); private set
+
+    /** The week's forecast, today first; empty until the first reading comes in. */
+    var forecast by mutableStateOf<List<WeatherDay>>(emptyList()); private set
 
     /** Where the weather is for, as a name to show; null until known. */
     var place by mutableStateOf<String?>(null); private set
@@ -87,6 +99,12 @@ object Weather {
         if (since >= REFRESH_MS || (failed && (networkCameUp || since >= RETRY_MS))) refresh()
     }
 
+    /** The forecast panel is opening: a week to show, when the last reading never came. */
+    fun refreshIfEmpty() {
+        if (!started || forecast.isNotEmpty()) return
+        refresh()
+    }
+
     private fun refresh() {
         lastAttempt = System.currentTimeMillis()
         job?.cancel()
@@ -97,21 +115,22 @@ object Weather {
             prefs.getString("place", null)?.let { place = it }
             failed = reading == null
             if (reading != null) {
-                now = reading
+                now = reading.now
+                forecast = reading.days
                 prefs.edit {
                     putLong("fetched_at", System.currentTimeMillis())
-                    putInt("celsius", reading.celsius)
-                    putString("kind", reading.kind.name)
-                    putBoolean("day", reading.day)
-                    putInt("high", reading.high ?: NONE)
-                    putInt("low", reading.low ?: NONE)
+                    putInt("celsius", reading.now.celsius)
+                    putString("kind", reading.now.kind.name)
+                    putBoolean("day", reading.now.day)
+                    putInt("high", reading.now.high ?: NONE)
+                    putInt("low", reading.now.low ?: NONE)
                 }
             }
         }
     }
 
     /** Off the main thread. */
-    private fun fetch(): WeatherNow {
+    private fun fetch(): Reading {
         var lat = prefs.getFloat("lat", Float.NaN)
         var lon = prefs.getFloat("lon", Float.NaN)
         val guessedLongAgo = System.currentTimeMillis() - prefs.getLong("located_at", 0) > RELOCATE_MS
@@ -134,18 +153,39 @@ object Weather {
                 putLong("located_at", System.currentTimeMillis())
             }
         }
-        val json = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto"))
+        val json = JSONObject(get("https://api.open-meteo.com/v1/forecast?latitude=$lat&longitude=$lon&current=temperature_2m,weather_code,is_day&daily=temperature_2m_max,temperature_2m_min,weather_code&forecast_days=$FORECAST_DAYS&timezone=auto"))
         val current = json.getJSONObject("current")
         val daily = json.optJSONObject("daily")
         fun today(key: String) = daily?.optJSONArray(key)?.optDouble(0)?.takeIf { !it.isNaN() }?.roundToInt()
-        return WeatherNow(
-            celsius = current.getDouble("temperature_2m").roundToInt(),
-            kind = kindOf(current.getInt("weather_code")),
-            day = current.optInt("is_day", 1) == 1,
-            high = today("temperature_2m_max"),
-            low = today("temperature_2m_min"),
+        return Reading(
+            now = WeatherNow(
+                celsius = current.getDouble("temperature_2m").roundToInt(),
+                kind = kindOf(current.getInt("weather_code")),
+                day = current.optInt("is_day", 1) == 1,
+                high = today("temperature_2m_max"),
+                low = today("temperature_2m_min"),
+            ),
+            days = forecast(daily),
         )
     }
+
+    /** The week as Open-Meteo gives it: its days are the place's own, so today is the first. */
+    private fun forecast(daily: JSONObject?): List<WeatherDay> {
+        val time = daily?.optJSONArray("time") ?: return emptyList()
+        val highs = daily.optJSONArray("temperature_2m_max")
+        val lows = daily.optJSONArray("temperature_2m_min")
+        val codes = daily.optJSONArray("weather_code")
+        fun int(array: org.json.JSONArray?, i: Int) = array?.optDouble(i)?.takeIf { !it.isNaN() }?.roundToInt()
+        return (0 until minOf(FORECAST_DAYS, time.length())).mapNotNull { i ->
+            val date = time.optString(i).takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            // A day without its own code would read as clear, which is a claim: leave it out.
+            val code = if (codes != null && !codes.isNull(i)) codes.getInt(i) else return@mapNotNull null
+            WeatherDay(date, kindOf(code), int(highs, i), int(lows, i))
+        }
+    }
+
+    /** What one fetch brought: the weather now, and the week. */
+    private data class Reading(val now: WeatherNow, val days: List<WeatherDay>)
 
     /**
      * A place chosen before 1.29 came from Open-Meteo's geocoder, which took 安庆 for a village in

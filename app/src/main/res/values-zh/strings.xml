@@ -206,6 +206,10 @@
     <string name="pin_arrows_hint">依次按 4 下方向键（上、下、左、右都可以）。</string>
     <string name="pin_arrows_create_hint">依次按 4 下方向键。请记好顺序：忘了只能用电脑通过 ADB 清除。</string>
     <string name="weather_clear">晴</string>
+    <string name="weather_week">一周天气</string>
+    <string name="weather_today">今天</string>
+    <string name="weather_tomorrow">明天</string>
+    <string name="weather_none">还没有预报</string>
     <string name="weather_partly_cloudy">多云</string>
     <string name="weather_cloudy">阴</string>
     <string name="weather_fog">雾</string>

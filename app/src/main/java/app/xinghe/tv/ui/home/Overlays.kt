@@ -71,6 +71,7 @@ import app.xinghe.tv.ui.theme.GlyphIcon
 import app.xinghe.tv.ui.theme.Motion
 import app.xinghe.tv.ui.theme.Palette
 import app.xinghe.tv.ui.theme.Type
+import app.xinghe.tv.weather.Weather
 import kotlin.math.roundToInt
 
 /** Keeps the last non-null value, so an overlay still has its content while it animates out. */
@@ -413,5 +414,79 @@ fun NoticeBanner(text: String?, modifier: Modifier = Modifier) {
             GlyphIcon(Glyph.Power, Palette.Label, 16.dp)
             BasicText(shown, style = Type.Callout.copy(color = Palette.Label), maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+    }
+}
+
+/**
+ * The week's weather, opened by pressing the clock: the place the clock shows the weather for, and
+ * one line a day — the day, its mark, then its high over its low. Back, or a press beside it,
+ * closes it. Days are named as the TV's own language has them; today and tomorrow by name.
+ */
+@Composable
+fun WeatherSheet(
+    visible: Boolean,
+    onDismiss: () -> Unit,
+) {
+    val days = Weather.forecast
+    val place = Weather.place
+    BackHandler(enabled = visible, onBack = onDismiss)
+    LaunchedEffect(visible) { if (visible) Weather.refreshIfEmpty() }
+    AnimatedVisibility(visible = visible, enter = fadeIn(tween(220)), exit = fadeOut(tween(180)), modifier = Modifier.fillMaxSize()) {
+        // A press beside the panel closes it, as Back does.
+        Box(Modifier.fillMaxSize().dismissOnTap(onDismiss).background(Color.Black.copy(alpha = 0.25f)))
+    }
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        AnimatedVisibility(
+            visible = visible,
+            enter = fadeIn(tween(200)) + scaleIn(tween(300, easing = Motion.Drawer), initialScale = 0.94f),
+            exit = fadeOut(tween(150)) + scaleOut(tween(150, easing = Motion.EaseOut), targetScale = 0.96f),
+        ) {
+            Column(
+                Modifier
+                    .width(520.dp)
+                    .consumeTaps()
+                    .liquidGlass(28.dp)
+                    .padding(horizontal = 26.dp, vertical = 22.dp),
+            ) {
+                BasicText(place ?: stringResource(R.string.weather_week), style = Type.LargeTitle)
+                place?.let {
+                    BasicText(
+                        stringResource(R.string.weather_week), style = Type.Callout.copy(color = Palette.SecondaryLabel),
+                        modifier = Modifier.padding(top = 2.dp, bottom = 14.dp),
+                    )
+                }
+                if (days.isEmpty()) {
+                    BasicText(
+                        stringResource(R.string.weather_none), style = Type.Body.copy(color = Palette.SecondaryLabel),
+                        modifier = Modifier.padding(vertical = 18.dp),
+                    )
+                } else days.forEach { day ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    ) {
+                        BasicText(dayLabel(day.date), style = Type.Body, modifier = Modifier.width(130.dp))
+                        GlyphIcon(glyphFor(day.kind), Palette.Label, 24.dp)
+                        Spacer(Modifier.weight(1f))
+                        val high = day.high?.let { "$it°" } ?: "—"
+                        val low = day.low?.let { "$it°" } ?: "—"
+                        BasicText("$high  /  $low", style = Type.Body.copy(color = Palette.Label))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The day as the TV speaks it: today, tomorrow, else its weekday. */
+@Composable
+private fun dayLabel(date: String): String {
+    val day = runCatching { java.time.LocalDate.parse(date) }.getOrNull() ?: return date
+    val today = java.time.LocalDate.now()
+    return when (day) {
+        today -> stringResource(R.string.weather_today)
+        today.plusDays(1) -> stringResource(R.string.weather_tomorrow)
+        else -> day.format(java.time.format.DateTimeFormatter.ofPattern("EEEE", java.util.Locale.getDefault()))
     }
 }

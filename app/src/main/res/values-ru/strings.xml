@@ -199,6 +199,10 @@
     <string name="pin_arrows_hint">Нажмите клавиши со стрелками четыре раза: вверх, вниз, влево или вправо.</string>
     <string name="pin_arrows_create_hint">Нажмите клавиши со стрелками четыре раза. Сохраните порядок в надёжном месте: если он забыт, сбросить его можно только с компьютера по ADB.</string>
     <string name="weather_clear">Ясно</string>
+    <string name="weather_week">Погода на неделю</string>
+    <string name="weather_today">Сегодня</string>
+    <string name="weather_tomorrow">Завтра</string>
+    <string name="weather_none">Прогноз пока недоступен</string>
     <string name="weather_partly_cloudy">Переменная облачность</string>
     <string name="weather_cloudy">Облачно</string>
     <string name="weather_fog">Туман</string>

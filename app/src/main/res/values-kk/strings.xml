@@ -199,6 +199,10 @@
     <string name="pin_arrows_hint">Көрсеткі пернелерін төрт рет басыңыз: жоғары, төмен, солға немесе оңға.</string>
     <string name="pin_arrows_create_hint">Көрсеткі пернелерін төрт рет басыңыз. Ретін сенімді жерде сақтаңыз: ұмытып қалсаңыз, оны тек компьютерден ADB арқылы ғана өшіруге болады.</string>
     <string name="weather_clear">Ашық</string>
+    <string name="weather_week">Апталық ауа райы</string>
+    <string name="weather_today">Бүгін</string>
+    <string name="weather_tomorrow">Ертең</string>
+    <string name="weather_none">Болжам әлі жоқ</string>
     <string name="weather_partly_cloudy">Ауыспалы бұлтты</string>
     <string name="weather_cloudy">Бұлтты</string>
     <string name="weather_fog">Тұман</string>

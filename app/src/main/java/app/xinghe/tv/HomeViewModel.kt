@@ -52,6 +52,8 @@ sealed interface Overlay {
     /** The owner's uploaded videos, as a folder under the wallpaper sheet: pick one, it stays. */
     data object Videos : Overlay
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
+    /** The week's weather, opened from the clock: the forecast for the place it shows. */
+    data object Weather : Overlay
 }
 
 enum class CcPage { Main, Inputs, InputSettings, Setup }

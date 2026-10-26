@@ -207,6 +207,10 @@
     <string name="pin_arrows_hint">Press the arrow keys four times: up, down, left or right.</string>
     <string name="pin_arrows_create_hint">Press the arrow keys four times. Keep the order somewhere safe: if it is forgotten, only a computer over ADB can clear it.</string>
     <string name="weather_clear">Clear</string>
+    <string name="weather_week">This week</string>
+    <string name="weather_today">Today</string>
+    <string name="weather_tomorrow">Tomorrow</string>
+    <string name="weather_none">No forecast yet</string>
     <string name="weather_partly_cloudy">Partly Cloudy</string>
     <string name="weather_cloudy">Cloudy</string>
     <string name="weather_fog">Fog</string>

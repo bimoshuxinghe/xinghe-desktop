@@ -440,10 +440,29 @@ fun ShelfClock(
     alignEnd: Boolean = false,
     /** How far the time has moved to the screensaver's place ([toSaverClock]); the date and weather go. */
     toSaver: () -> Float = { 0f },
+    /** Pressing the clock opens the week's weather; null where the clock is not to be pressed. */
+    onWeather: (() -> Unit)? = null,
 ) {
     val shadow = Shadow(Color.Black.copy(alpha = 0.28f), Offset(0f, 2f), blurRadius = 18f)
     val secondary = Color.White.copy(alpha = 0.78f)
     val aside = Modifier.graphicsLayer { alpha = 1f - (toSaver() * 2.5f).coerceIn(0f, 1f) }
+    // The clock itself is the way into the forecast: it is what shows the weather beside the time.
+    if (onWeather != null) return Pressable(onClick = onWeather, modifier = modifier, focusedScale = 1.03f) {
+        ShelfClockBody(now, alignEnd, toSaver, shadow, secondary, aside, Modifier.align(if (alignEnd) Alignment.TopEnd else Alignment.TopStart))
+    }
+    ShelfClockBody(now, alignEnd, toSaver, shadow, secondary, aside, modifier)
+}
+
+@Composable
+private fun ShelfClockBody(
+    now: LocalDateTime,
+    alignEnd: Boolean,
+    toSaver: () -> Float,
+    shadow: Shadow,
+    secondary: Color,
+    aside: Modifier,
+    modifier: Modifier,
+) {
     Column(modifier, horizontalAlignment = if (alignEnd) Alignment.End else Alignment.Start) {
         BasicText(dateText(now), style = Type.Title.copy(color = Color.White.copy(alpha = 0.9f), shadow = shadow), modifier = aside)
         BasicText(
@@ -455,7 +474,7 @@ fun ShelfClock(
         )
         Weather.now?.let { w ->
             Row(aside, verticalAlignment = Alignment.CenterVertically) {
-                GlyphIcon(glyphFor(w), Color.White, 22.dp, Modifier.padding(end = 8.dp))
+                GlyphIcon(glyphFor(w.kind, w.day), Color.White, 22.dp, Modifier.padding(end = 8.dp))
                 BasicText("${w.celsius}°", style = Type.Title.copy(color = Color.White, shadow = shadow))
                 val place = Weather.place?.takeIf { it.length <= 12 }
                 val range = if (w.high != null && w.low != null) stringResource(R.string.weather_high_low, w.high, w.low) else null
@@ -524,9 +543,29 @@ private fun conditionName(kind: WeatherKind): Int = when (kind) {
  * pill, so the wallpaper keeps the rest of the screen. A soft shadow keeps it readable on photos.
  */
 @Composable
-fun CornerClock(now: LocalDateTime, modifier: Modifier = Modifier, toSaver: () -> Float = { 0f }) {
+fun CornerClock(
+    now: LocalDateTime,
+    modifier: Modifier = Modifier,
+    toSaver: () -> Float = { 0f },
+    /** Pressing the clock opens the week's weather; null where the clock is not to be pressed. */
+    onWeather: (() -> Unit)? = null,
+) {
     val dim = Color.White.copy(alpha = 0.92f)
     val shadow = Shadow(Color.Black.copy(alpha = 0.5f), blurRadius = 8f)
+    if (onWeather != null) return Pressable(onClick = onWeather, modifier = modifier, focusedScale = 1.04f) {
+        CornerClockBody(now, toSaver, dim, shadow, Modifier.align(Alignment.CenterStart))
+    }
+    CornerClockBody(now, toSaver, dim, shadow, modifier)
+}
+
+@Composable
+private fun CornerClockBody(
+    now: LocalDateTime,
+    toSaver: () -> Float,
+    dim: Color,
+    shadow: Shadow,
+    modifier: Modifier,
+) {
     Row(modifier.height(34.dp), verticalAlignment = Alignment.CenterVertically) {
         BasicText(
             timeText(now), style = Type.Title.copy(color = dim, shadow = shadow),
@@ -534,16 +573,17 @@ fun CornerClock(now: LocalDateTime, modifier: Modifier = Modifier, toSaver: () -
         )
         Weather.now?.let { w ->
             val aside = Modifier.graphicsLayer { alpha = 1f - (toSaver() * 2.5f).coerceIn(0f, 1f) }
-            GlyphIcon(glyphFor(w), dim, 18.dp, aside.padding(start = 16.dp, end = 6.dp))
+            GlyphIcon(glyphFor(w.kind, w.day), dim, 18.dp, aside.padding(start = 16.dp, end = 6.dp))
             val place = Weather.place?.takeIf { it.length <= 12 }
             BasicText(listOfNotNull(place, "${w.celsius}°").joinToString(" "), style = Type.Headline.copy(color = dim, shadow = shadow), modifier = aside)
         }
     }
 }
 
-private fun glyphFor(w: WeatherNow): Glyph = when (w.kind) {
-    WeatherKind.Clear -> if (w.day) Glyph.Sun else Glyph.Moon
-    WeatherKind.PartlyCloudy -> if (w.day) Glyph.CloudSun else Glyph.Cloud
+/** The mark for a reading: night has its own for clear and partly cloudy. */
+internal fun glyphFor(kind: WeatherKind, day: Boolean = true): Glyph = when (kind) {
+    WeatherKind.Clear -> if (day) Glyph.Sun else Glyph.Moon
+    WeatherKind.PartlyCloudy -> if (day) Glyph.CloudSun else Glyph.Cloud
     WeatherKind.Cloudy -> Glyph.Cloud
     WeatherKind.Fog -> Glyph.CloudFog
     WeatherKind.Rain -> Glyph.CloudRain

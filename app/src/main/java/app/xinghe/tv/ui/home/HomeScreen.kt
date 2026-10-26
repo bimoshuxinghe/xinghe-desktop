@@ -188,6 +188,9 @@ fun HomeScreen(
 ) {
     val apps = vm.apps
     val overlay = vm.overlay
+    // Pressing the clock opens the week's weather. One instance: Home recomposes on every key
+    // press, and the clock would otherwise be handed a new one each time and recomposed with it.
+    val openWeather = remember { { vm.overlay = Overlay.Weather } }
     val moving = vm.movingKey
     val reduced = LocalReducedMotion.current
     val density = LocalDensity.current
@@ -205,6 +208,12 @@ fun HomeScreen(
     // view's own first one — or once focus walks into the grid from below (Up from a lower row,
     // a restored focus). Up from the grid's first row closes it again, as Back and the Home key do.
     var gridMode by remember { mutableStateOf(false) }
+    // One instance of each, and not a new lambda on every composition: a tile is skipped by
+    // Compose when every argument it is given is the same, and with a lambda made afresh each
+    // time, moving the cursor recomposed every tile there is — which is what cost a frame on
+    // the fuller Home screens.
+    val enterGrid = remember { { gridMode = true } }
+    val leaveGrid = remember { { gridMode = false } }
     // Where focus goes when the overlay closes, when that is not the tile it was on. Kept apart
     // from focusedKey: a closing menu hands focus to whatever tile lies under it first.
     var focusAfterOverlay by remember { mutableStateOf<String?>(null) }
@@ -569,6 +578,7 @@ fun HomeScreen(
                             .padding(top = metrics.clockY)
                             .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
                         toSaver = { toSaver.value },
+                        onWeather = openWeather,
                     )
                 } else if (!clockRight) {
                     CornerClock(
@@ -577,6 +587,7 @@ fun HomeScreen(
                             .padding(start = metrics.margin, top = 28.dp)
                             .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
                         toSaver = { toSaver.value },
+                        onWeather = openWeather,
                     )
                 }
 
@@ -593,47 +604,51 @@ fun HomeScreen(
                             spring(dampingRatio = 0.86f, stiffness = Spring.StiffnessMediumLow),
                             label = "slot",
                         )
-                        AppTile(
-                            app = app,
-                            width = metrics.tileW,
-                            height = metrics.tileH,
-                            focusRequester = requester(app.key),
-                            enabled = gridEnabled,
-                            moving = moving == app.key,
-                            appearDelayMs = (index * 28).coerceAtMost(320),
-                            onFocused = {
+                        // What the tile is given is the very same instance from one composition to
+                        // the next. Nothing of it captures what a key press changes — the moving
+                        // key, the row in focus, the apps themselves are read through [vm] and
+                        // through state, inside — so moving the cursor recomposes Home and the two
+                        // tiles it moved between, and no other: with fifty apps on a slow TV that
+                        // is the difference between following the cursor and losing a frame.
+                        val onTileFocused = remember(app.key, index) {
+                            {
                                 focusedKey = app.key
                                 lastFocusedIndex = index
                                 pillFocused = false
-                            },
-                            onClick = { bounds ->
-                                val mover = moving
-                                if (mover == null) {
-                                    val folder = app.folder
-                                    if (folder == null) onLaunch(app, bounds)
-                                    else {
-                                        // Closing the folder comes back to its tile.
-                                        focusAfterOverlay = app.key
-                                        indexAfterOverlay = index
-                                        vm.overlay = Overlay.Folder(folder.id)
-                                    }
-                                }
-                                // While moving, tapping a tile puts the app there; tapping the app
-                                // itself is done.
-                                else if (mover == app.key) vm.endMove()
+                            }
+                        }
+                        val onTileClick = remember(app, index, vm, onLaunch) { { bounds: Rect? ->
+                            val mover = vm.movingKey
+                            if (mover == null) {
+                                val folder = app.folder
+                                if (folder == null) onLaunch(app, bounds)
                                 else {
-                                    vm.moveBy(index - apps.indexOfFirst { it.key == mover })
-                                    runCatching { requester(mover).requestFocus() }
-                                }
-                            },
-                            onLongPress = { bounds ->
-                                if (moving == null) {
+                                    // Closing the folder comes back to its tile.
                                     focusAfterOverlay = app.key
                                     indexAfterOverlay = index
-                                    vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
+                                    vm.overlay = Overlay.Folder(folder.id)
                                 }
-                            },
-                            modifier = Modifier
+                            }
+                            // While moving, tapping a tile puts the app there; tapping the app
+                            // itself is done.
+                            else if (mover == app.key) vm.endMove()
+                            else {
+                                vm.moveBy(index - vm.apps.indexOfFirst { it.key == mover })
+                                runCatching { requester(mover).requestFocus() }
+                            }
+                            Unit
+                        } }
+                        val onTileLongPress = remember(app, index, vm) { { bounds: Rect? ->
+                            if (vm.movingKey == null) {
+                                focusAfterOverlay = app.key
+                                indexAfterOverlay = index
+                                vm.overlay = Overlay.AppMenu(app.key, bounds ?: Rect.Zero)
+                            }
+                        } }
+                        // Built once, not on every composition: it reads the animatables and the
+                        // state it needs from inside, so the tile keeps this very modifier.
+                        val tileModifier = remember(index, hideBelow, collapsePx) {
+                            Modifier
                                 .offset { slot.value }
                                 .then(
                                     if (hideBelow && index >= COLUMNS) Modifier.graphicsLayer {
@@ -648,7 +663,9 @@ fun HomeScreen(
                                 // black stripe once the all-apps view's background turned transparent.
                                 .graphicsLayer {
                                     val f = ((toSaver.value - 0.05f * (index % COLUMNS)) / 0.6f).coerceIn(0f, 1f)
-                                    val top = slotPx.y - scroll.value
+                                    // The row as it lies now, not where it is headed: the same
+                                    // answer once the spring has settled.
+                                    val top = slot.value.y - scroll.value
                                     val band = (PillBottom + PillFade).toPx()
                                     val under = ((band - top) / (band - PillTop.toPx())).coerceIn(0f, 1f)
                                     val a = (1f - f) * (1f - under * pillShown)
@@ -658,15 +675,28 @@ fun HomeScreen(
                                         compositingStrategy = CompositingStrategy.ModulateAlpha
                                     }
                                     if (f > 0f) translationY = f * 18.dp.toPx()
-                                },
+                                }
+                        }
+                        AppTile(
+                            app = app,
+                            width = metrics.tileW,
+                            height = metrics.tileH,
+                            focusRequester = requester(app.key),
+                            enabled = gridEnabled,
+                            moving = moving == app.key,
+                            appearDelayMs = (index * 28).coerceAtMost(320),
+                            onFocused = onTileFocused,
+                            onClick = onTileClick,
+                            onLongPress = onTileLongPress,
+                            modifier = tileModifier,
                             rowEnd = index % COLUMNS == COLUMNS - 1 || index == apps.lastIndex,
                             // Down from the home screen's top row opens the all-apps view and
                             // leaves focus where it is: the view starts at its own first row,
                             // the one Down was on, rather than at the second.
-                            enterGrid = if (!gridMode && index < COLUMNS && rows > 1) { { gridMode = true } } else null,
+                            enterGrid = if (!gridMode && index < COLUMNS && rows > 1) enterGrid else null,
                             // Up from the all-apps view's first row goes home: back to the top
                             // row, where this very tile sits, so focus stays.
-                            leaveGrid = if (gridMode && index < COLUMNS) { { gridMode = false } } else null,
+                            leaveGrid = if (gridMode && index < COLUMNS) leaveGrid else null,
                             // On the glass plate only with every name shown (an earlier build showed
                             // the focused one alone there, but it sat oddly on the glass). In the
                             // all-apps view the first row shows its names like every other row.
@@ -700,6 +730,7 @@ fun HomeScreen(
                         .padding(end = 14.dp)
                         .graphicsLayer { alpha = 1f - (scroll.value / collapsePx * 1.6f).coerceIn(0f, 1f) },
                     toSaver = { toSaver.value },
+                    onWeather = openWeather,
                 )
             }
             StatusPill(
@@ -861,6 +892,12 @@ fun HomeScreen(
         VideosSheet(
             visible = overlay is Overlay.Videos,
             onDismiss = { vm.overlay = Overlay.Wallpaper },
+        )
+
+        // The week's weather, out of the clock.
+        WeatherSheet(
+            visible = overlay is Overlay.Weather,
+            onDismiss = { vm.overlay = Overlay.None },
         )
 
         val pin = overlay as? Overlay.Pin
