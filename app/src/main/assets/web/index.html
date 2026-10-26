@@ -250,17 +250,6 @@
     <button class="item" role="radio" data-mode="videos"><span class="txt"><span data-i18n="ss_videos"></span><span class="sub" data-i18n="hint_videos"></span></span><svg class="tick" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></button>
   </div>
   <p class="foot" id="ssFoot"></p>
-  <div id="videos" hidden>
-    <h2 data-i18n="videos_h"></h2>
-    <div class="list" id="videoList"></div>
-    <div class="list" style="margin-top:10px">
-      <label class="item tint center" id="videoUploadBtn">
-        <span id="videoUploadLabel" data-i18n="videos_upload"></span>
-        <input id="videoFile" type="file" accept=".mp4,.mov,video/mp4,video/quicktime" multiple hidden>
-      </label>
-    </div>
-    <p class="foot" data-i18n="videos_hint"></p>
-  </div>
 </section>
 
 <!-- More -->
@@ -321,7 +310,7 @@ let state = null, stateJson = '';
 
 // The language: ?lang=ru in the address, else the one picked under More (kept on the phone), else the
 // first of the phone's preferred languages that has a table, else English. Keys are in KEYS, one array of texts per language.
-const KEYS = ["screensaver", "screensaver_short", "ss_aerial", "ss_photos", "ss_clock", "focus", "focus_high", "focus_standard", "weather", "city_ph", "set", "upload_label", "feedback_h", "feedback_hint", "diag_show", "diag_copy", "diag_github", "hint_aerial", "hint_photos", "hint_clock", "g_live", "g_live_sub", "g_daily", "g_daily_sub", "g_photo", "g_builtin", "g_auto", "toast_wallpaper", "aria_delete", "confirm_delete", "wx_clear", "wx_partlycloudy", "wx_cloudy", "wx_fog", "wx_rain", "wx_snow", "wx_thunder", "wx_chosen", "wx_auto_btn", "toast_auto", "wx_guessed", "wx_none", "tag_source", "aria_rename", "toast_renamed", "toast_name_reset", "toast_rename_fail", "aria_reset_icon", "toast_icon_reset", "focus_hint_standard", "focus_hint_high", "daily_title", "daily_caption", "rotate_title", "rotate_caption", "empty_photos", "add_second", "toast_tv_updated", "sending_n", "toast_added", "toast_no_photos", "toast_send_fail", "toast_city_set", "toast_city_nf", "toast_set_fail", "toast_sending_icon", "toast_icon_set", "toast_icon_bad", "diag_collecting", "toast_diag_fail", "toast_copied", "toast_copy_manual", "language", "hint_follows", "ss_videos", "hint_videos", "videos_h", "videos_upload", "videos_hint", "videos_empty", "confirm_video_delete", "toast_videos_added", "toast_video_bad", "sending_video", "hint_system", "tab_home", "tab_more", "current_wp", "cancel", "save", "name_ph", "rename_hint", "change_icon", "this_tv", "folder_count", "folder_ph", "inputs_h", "inputs_hint", "rename_hint_app", "was_named", "arrange_hint", "arrange_unready", "hidden_h", "hidden_none", "hidden_locked", "show_app", "hide_app", "to_folder", "new_folder", "out_of_folder", "ungroup", "ungroup_confirm", "folder_hint", "toast_hidden", "toast_shown", "toast_in_folder", "toast_out_folder", "toast_ungrouped", "tab_looks", "looks_title", "show_on_home", "source_device", "source_plain", "source_device_hint", "tv_model"];
+const KEYS = ["screensaver", "screensaver_short", "ss_aerial", "ss_photos", "ss_clock", "focus", "focus_high", "focus_standard", "weather", "city_ph", "set", "upload_label", "feedback_h", "feedback_hint", "diag_show", "diag_copy", "diag_github", "hint_aerial", "hint_photos", "hint_clock", "g_live", "g_live_sub", "g_daily", "g_daily_sub", "g_photo", "g_builtin", "g_auto", "toast_wallpaper", "aria_delete", "confirm_delete", "wx_clear", "wx_partlycloudy", "wx_cloudy", "wx_fog", "wx_rain", "wx_snow", "wx_thunder", "wx_chosen", "wx_auto_btn", "toast_auto", "wx_guessed", "wx_none", "tag_source", "aria_rename", "toast_renamed", "toast_name_reset", "toast_rename_fail", "aria_reset_icon", "toast_icon_reset", "focus_hint_standard", "focus_hint_high", "daily_title", "daily_caption", "rotate_title", "rotate_caption", "empty_photos", "add_second", "toast_tv_updated", "sending_n", "toast_added", "toast_no_photos", "toast_send_fail", "toast_city_set", "toast_city_nf", "toast_set_fail", "toast_sending_icon", "toast_icon_set", "toast_icon_bad", "diag_collecting", "toast_diag_fail", "toast_copied", "toast_copy_manual", "language", "hint_follows", "ss_videos", "hint_videos", "videos_h", "videos_upload", "videos_hint", "videos_empty", "confirm_video_delete", "toast_videos_added", "toast_video_bad", "sending_video", "hint_system", "tab_home", "tab_more", "current_wp", "cancel", "save", "name_ph", "rename_hint", "change_icon", "this_tv", "folder_count", "folder_ph", "inputs_h", "inputs_hint", "rename_hint_app", "was_named", "arrange_hint", "arrange_unready", "hidden_h", "hidden_none", "hidden_locked", "show_app", "hide_app", "to_folder", "new_folder", "out_of_folder", "ungroup", "ungroup_confirm", "folder_hint", "toast_hidden", "toast_shown", "toast_in_folder", "toast_out_folder", "toast_ungrouped", "tab_looks", "looks_title", "show_on_home", "source_device", "source_plain", "source_device_hint", "tv_model", "g_video"];
 const TEXTS = {
  "zh": [
   "屏幕保护程序",
@@ -448,7 +437,8 @@ const TEXTS = {
   "接入的设备",
   "默认",
   "选一个设备，电视上这个信号源的图标会换成它的样子，名字也跟着变；自己起的名字会被替换。",
-  "型号"
+  "型号",
+  "我的视频"
  ],
  "en": [
   "Screensaver",
@@ -575,7 +565,8 @@ const TEXTS = {
   "Connected Device",
   "Default",
   "Pick a device and the tile on the TV takes its look and its name; a name you typed is replaced.",
-  "Model"
+  "Model",
+  "My Videos"
  ],
  "ru": [
   "Заставка",
@@ -702,7 +693,8 @@ const TEXTS = {
   "Подключённое устройство",
   "По умолчанию",
   "Выберите устройство — плитка на телевизоре примет его вид и название; введённое вами название заменится.",
-  "Модель"
+  "Модель",
+  "Мои видео"
  ],
  "uk": [
   "Заставка",
@@ -829,7 +821,8 @@ const TEXTS = {
   "Підключений пристрій",
   "Типово",
   "Виберіть пристрій — плитка на телевізорі набуде його вигляду й назви; введену вами назву буде замінено.",
-  "Модель"
+  "Модель",
+  "Мої відео"
  ],
  "kk": [
   "Экран қорғаушы",
@@ -956,7 +949,8 @@ const TEXTS = {
   "Қосылған құрылғы",
   "Әдепкі",
   "Құрылғыны таңдасаңыз, теледидардағы плитка оның түрі мен атауын алады; өзіңіз жазған атау ауыстырылады.",
-  "Модель"
+  "Модель",
+  "Видеоларым"
  ]
 };
 const LANGS = Object.keys(TEXTS);
@@ -999,6 +993,7 @@ const groups = [
   ['live', t('g_live'), t('g_live_sub')],
   ['daily', t('g_daily'), t('g_daily_sub')],
   ['photo', t('g_photo'), ''],
+  ['video', t('g_video'), ''],
   ['builtin', t('g_builtin'), ''],
   ['auto', t('g_auto'), '']
 ];
@@ -1130,6 +1125,23 @@ function renderWallpapers() {
       root.appendChild(up);
       if (!list.length) { root.appendChild(el('p', 'empty', t('empty_photos'))); continue; }
     }
+    // The films, as their own group next to the photos: add from the phone, tap a film to make
+    // it the wallpaper — the same pick its card does on the TV.
+    if (kind === 'video') {
+      const up = el('label', 'btn add');
+      up.innerHTML = `${ICON.plus}<span></span><input type="file" accept=".mp4,.mov,video/mp4,video/quicktime" multiple hidden>`;
+      up.querySelector('span').textContent = sendingVideo || t('videos_upload');
+      if (sendingVideo) up.setAttribute('disabled', '');
+      up.querySelector('input').onchange = uploadVideos;
+      root.appendChild(up);
+      const list = el('div', 'list'); list.style.marginTop = '10px';
+      const videos = state.videos || [];
+      if (!videos.length) { const row = el('div', 'item'); row.appendChild(el('span', 'txt', t('videos_empty'))).style.color = 'var(--secondary)'; list.appendChild(row); }
+      for (const video of videos) list.appendChild(videoRow(video));
+      root.appendChild(list);
+      root.appendChild(el('p', 'foot', t('videos_hint')));
+      continue;
+    }
     const g = el('div', 'grid');
     list.forEach(w => g.appendChild(card(w)));
     root.appendChild(g);
@@ -1137,6 +1149,32 @@ function renderWallpapers() {
     if (kind === 'photo' && list.length === 1) root.appendChild(el('p', 'foot', t('add_second')));
   }
 }
+function videoRow(video) {
+  const id = 'video:' + video.id;
+  const row = el('div', 'item');
+  const thumb = el('img', 'thumb');
+  thumb.src = `${base}thumb/${encodeURIComponent(id)}`;
+  thumb.alt = ''; thumb.loading = 'lazy';
+  row.appendChild(thumb);
+  row.appendChild(el('span', 'txt', video.name));
+  if (state.selected === id) { const tick = el('span', 'txt'); tick.innerHTML = ICON.tick; tick.style.color = 'var(--tint)'; row.appendChild(tick); }
+  row.style.cursor = 'pointer';
+  // Tapping the film makes it the wallpaper; the TV's folder asks for nothing more.
+  row.onclick = async () => {
+    if (state.selected === id) return;
+    try { take(await api('api/wallpaper', { id })); toast(t('toast_wallpaper')); } catch (err) { toast(t('toast_set_fail')); }
+  };
+  const del = el('button', 'link', t('aria_delete')); del.style.color = 'var(--danger)';
+  del.onclick = async e => {
+    e.stopPropagation();
+    if (!confirm(t('confirm_video_delete', { name: video.name }))) return;
+    del.disabled = true;
+    try { take(await api('api/videos/delete', { id: video.id })); } catch (err) { del.disabled = false; toast(t('toast_video_bad')); }
+  };
+  row.appendChild(del);
+  return row;
+}
+
 let uploading = 0;
 async function uploadPhotos(e) {
   const files = [...e.target.files]; if (!files.length) return;
@@ -1156,26 +1194,6 @@ function renderScreensaver() {
   document.querySelectorAll('#ss [data-mode]').forEach(b => b.setAttribute('aria-checked', b.dataset.mode === state.screensaver ? 'true' : 'false'));
   $('#ssFoot').textContent = state.screensaverFollows ? t('hint_follows') : state.screensaver === 'system' ? hints.system : '';
   $('#ssFoot').hidden = !$('#ssFoot').textContent;
-  $('#videos').hidden = state.screensaver !== 'videos';
-  const list = $('#videoList'); list.replaceChildren();
-  const videos = state.videos || [];
-  if (!videos.length) { const row = el('div', 'item'); row.appendChild(el('span', 'txt', t('videos_empty'))).style.color = 'var(--secondary)'; list.appendChild(row); }
-  for (const video of videos) {
-    const row = el('div', 'item');
-    const thumb = el('img', 'thumb');
-    thumb.src = `${base}thumb/${encodeURIComponent('video:' + video.id)}`;
-    thumb.alt = ''; thumb.loading = 'lazy';
-    row.appendChild(thumb);
-    row.appendChild(el('span', 'txt', video.name));
-    const del = el('button', 'link', t('aria_delete')); del.style.color = 'var(--danger)';
-    del.onclick = async () => {
-      if (!confirm(t('confirm_video_delete', { name: video.name }))) return;
-      del.disabled = true;
-      try { take(await api('api/videos/delete', { id: video.id })); } catch (err) { del.disabled = false; toast(t('toast_video_bad')); }
-    };
-    row.appendChild(del); list.appendChild(row);
-  }
-  $('#videoUploadLabel').textContent = sendingVideo || t('videos_upload');
 }
 document.querySelectorAll('#ss [data-mode]').forEach(b => b.onclick = async () => {
   if (b.dataset.mode === state.screensaver && !state.screensaverFollows) return;
@@ -1204,13 +1222,11 @@ async function grabThumb(file) {
   } finally { URL.revokeObjectURL(url); }
 }
 
-$('#videoFile').onchange = async e => {
+async function uploadVideos(e) {
   const input = e.target; const files = [...input.files]; if (!files.length) return;
-  const btn = $('#videoUploadBtn');
-  input.disabled = true; btn.setAttribute('disabled', '');
   let added = 0;
   for (const [i, file] of files.entries()) {
-    sendingVideo = t('sending_video', { n: i + 1, total: files.length }); $('#videoUploadLabel').textContent = sendingVideo;
+    sendingVideo = t('sending_video', { n: i + 1, total: files.length }); stateJson = ''; render();
     if (!file.size || file.size > 200 * 1024 * 1024) continue;
     try {
       const fd = new FormData(); fd.append('video', file, file.name);
@@ -1221,9 +1237,9 @@ $('#videoFile').onchange = async e => {
       const next = await r.json(); if (next.saved) added++; take(next);
     } catch (err) { /* Keep going: a failed film should not discard the rest of the batch. */ }
   }
-  sendingVideo = ''; input.disabled = false; input.value = ''; btn.removeAttribute('disabled'); stateJson = ''; render();
+  sendingVideo = ''; input.value = ''; stateJson = ''; render();
   toast(t('toast_videos_added', { n: added, failed: files.length - added }));
-};
+}
 
 /* More tab: focus style and weather. */
 const weatherNames = { clear: t('wx_clear'), partlycloudy: t('wx_partlycloudy'), cloudy: t('wx_cloudy'), fog: t('wx_fog'), rain: t('wx_rain'), snow: t('wx_snow'), thunder: t('wx_thunder') };
