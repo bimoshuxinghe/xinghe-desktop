@@ -42,6 +42,12 @@ internal object CecHome {
     private data class Target(val input: String, val address: Int)
     private var lastReport: String? = null
 
+    /** The answer to [active] keeps this long: see there. */
+    private const val ACTIVE_FOR_MS = 3_000L
+    private var cachedFor: String? = null
+    private var cachedAt = 0L
+    private var cached = false
+
     private fun target(context: Context, frontPackage: String?): Target? = runCatching {
         if (frontPackage == null || !enabled(context)) return null
         val config = prefs(context)
@@ -96,7 +102,21 @@ internal object CecHome {
         vendor == 0x0010fa || ((vendor == null || vendor == 0) &&
             Regex("""(?i)^apple[ _-]*tv(?:\s.*)?$""").matches(name.trim()))
 
-    fun active(context: Context, frontPackage: String?): Boolean = target(context, frontPackage) != null
+    /**
+     * Whether the front package is the one CEC Home means. Asked for on every window change, and
+     * asking costs settings reads and a listing of the TV's inputs across to the system — which,
+     * while an app is starting, is work the system needs for that app. The answer cannot change
+     * inside [ACTIVE_FOR_MS], and the package it is for is part of the key.
+     */
+    fun active(context: Context, frontPackage: String?): Boolean {
+        val at = android.os.SystemClock.elapsedRealtime()
+        if (cachedFor == frontPackage && at - cachedAt < ACTIVE_FOR_MS) return cached
+        val answer = target(context, frontPackage) != null
+        cachedFor = frontPackage
+        cachedAt = at
+        cached = answer
+        return answer
+    }
 
     fun send(context: Context, frontPackage: String?) {
         val address = target(context, frontPackage)?.address ?: return

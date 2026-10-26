@@ -665,6 +665,16 @@ class HomeGuardService : AccessibilityService() {
         if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
         val pkg = event.packageName?.toString() ?: return
         val cls = event.className?.toString() ?: return
+        // An app starting throws out a burst of these, and every one of them used to cost the
+        // system: the default Home resolved, the TV's inputs listed, settings read — dozens of
+        // binder calls into system_server while the app the viewer opened is trying to start,
+        // which is what made opening an app from Home slow where the stock launcher is quick.
+        // The same package saying the same thing again so soon is not news. Another package —
+        // the stock launcher taking the front, say — is never held back.
+        val at = SystemClock.uptimeMillis()
+        if (pkg == lastWindowEventPkg && at - lastWindowEventAt < WINDOW_EVENT_THROTTLE_MS) return
+        lastWindowEventPkg = pkg
+        lastWindowEventAt = at
         // Only activities count as what is in front. Overlays and dialogs also raise this event:
         // TCL's voice assistant (com.tcl.walleve) does at boot on TCL 75S365C, and taking it for
         // an app the viewer chose kept the guard from taking over (PR #45).
@@ -722,11 +732,21 @@ class HomeGuardService : AccessibilityService() {
 
     private fun isDefaultHome(): Boolean = resolvedHome() == packageName
 
-    private fun resolvedHome(): String? =
-        packageManager.resolveActivity(
+    /**
+     * Which package answers the Home action. Kept for [HOME_RESOLVED_FOR_MS]: it is asked for on
+     * every window change, and asking means a query across to system_server — which is the last
+     * thing an app being started needs. Home changes rarely, and only a choice the viewer makes.
+     */
+    private fun resolvedHome(): String? {
+        val at = SystemClock.elapsedRealtime()
+        resolvedHomeFor?.let { if (at - it.second < HOME_RESOLVED_FOR_MS) return it.first }
+        val pkg = packageManager.resolveActivity(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
             PackageManager.MATCH_DEFAULT_ONLY,
         )?.activityInfo?.packageName
+        resolvedHomeFor = pkg to at
+        return pkg
+    }
 
     private fun refreshStockHomes() {
         val standard = packageManager.queryIntentActivities(
@@ -777,6 +797,13 @@ class HomeGuardService : AccessibilityService() {
     /** When goHome last started Aerial. */
     private var broughtBackAt = Long.MIN_VALUE / 2
 
+    /** The last package whose window change was looked at, and when: see onAccessibilityEvent. */
+    private var lastWindowEventPkg: String? = null
+    private var lastWindowEventAt = 0L
+
+    /** What Home resolved to, and when. */
+    private var resolvedHomeFor: Pair<String?, Long>? = null
+
     private fun goHome(woke: Boolean = false) {
         if (!GuardSetup.isUserUnlocked(this)) return
         // Starting an activity can light the screen: on OPPO K9 the TV came back on by itself a few
@@ -808,6 +835,9 @@ class HomeGuardService : AccessibilityService() {
         private const val FOREGROUND_POLL_MS = 1_000L
         private const val FOREGROUND_LOOKBACK_MS = 10_000L
         private const val DOUBLE_HOME_MS = 400L
+        /** How long one package's repeated window changes are left alone, and Home's answer kept. */
+        private const val WINDOW_EVENT_THROTTLE_MS = 400L
+        private const val HOME_RESOLVED_FOR_MS = 10_000L
         private const val VOLUME_REPEAT_MAX_MS = 8_000L
         private val VOLUME_KEYS = setOf(KeyEvent.KEYCODE_VOLUME_UP, KeyEvent.KEYCODE_VOLUME_DOWN, KeyEvent.KEYCODE_VOLUME_MUTE)
 
