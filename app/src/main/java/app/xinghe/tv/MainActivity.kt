@@ -659,12 +659,6 @@ class MainActivity : ComponentActivity() {
             return
         }
         openedAppSinceHome = true
-        // Let the film's decoder go before the app is asked for, not after: these TVs have one
-        // video decoder, and an app that wants it — every video app, and the firmware's own
-        // players — waits on a black screen for Home to pause and hand it over, which is the
-        // four or five seconds opening an app cost while the stock launcher was quick. Home
-        // opens it again when it comes back (LiveWallpaper: a player left idle is prepared).
-        runCatching { LiveFilm.onHome?.letDecoderGo() }
         // The stock launcher (Xiaomi's PatchWall, with the maker's own iQIYI / Mango content) opens
         // through the system Home action where it can; see HomeGuardService.openStockLauncher.
         if (HomeGuardService.isStockHome(app.packageName) &&

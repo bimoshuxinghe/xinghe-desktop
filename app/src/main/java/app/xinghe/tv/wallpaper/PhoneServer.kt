@@ -82,7 +82,7 @@ class PhoneServer private constructor(private val context: Context, private val 
                 session.method == Method.POST && path == "/api/videos/upload" -> video(session)
                 session.method == Method.POST && path == "/api/videos/delete" -> {
                     val removed = ScreensaverVideos.delete(context, form(session)["id"].orEmpty())
-                    Wallpapers.refreshVideos()
+                    Wallpapers.refreshVideosSync()
                     json(state().put("removed", removed))
                 }
                 path.startsWith("/tile/") -> tile(java.net.URLDecoder.decode(path.removePrefix("/tile/"), "UTF-8"))
@@ -329,7 +329,10 @@ class PhoneServer private constructor(private val context: Context, private val 
         // what the TV's retriever will not, and the TV opens no second decoder to try.
         val thumb = files["thumb"]?.let(::File)?.takeIf { it.exists() && it.length() > 0 }
         val saved = ScreensaverVideos.add(context, File(path), name, thumb) != null
-        Wallpapers.refreshVideos()
+        // Waited out, not merely started: the phone asks for the new film's thumbnail the moment
+        // this answers, and until the list has been rescanned there is no such wallpaper to take a
+        // picture of — the tile stayed blank whichever way the film was sent (1.6.0).
+        Wallpapers.refreshVideosSync()
         return json(state().put("saved", saved))
     }
 

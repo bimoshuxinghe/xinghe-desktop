@@ -1114,7 +1114,9 @@ function renderWallpapers() {
     if (kind === 'daily' && list.length) list = [{ id: state.latestDaily, kind: 'daily', title: t('daily_title'), caption: t('daily_caption') }, ...list];
     // Two or more photos: one a day, as on the TV (#27, #194).
     if (kind === 'photo' && list.length > 1) list = [{ id: state.rotatePhotos, kind: 'photos', title: t('rotate_title'), caption: t('rotate_caption') }, ...list];
-    if (!list.length && kind !== 'photo') continue;
+    // Photos ask for pictures even with none; so do the films, whose own list is state.videos and
+    // not yet among the wallpapers while the rescan runs (1.6.0).
+    if (!list.length && kind !== 'photo' && kind !== 'video') continue;
     root.appendChild(el('h2', 'big', title));
     if (kind === 'photo') {
       const up = el('label', 'btn add');
@@ -1153,7 +1155,15 @@ function videoRow(video) {
   const id = 'video:' + video.id;
   const row = el('div', 'item');
   const thumb = el('img', 'thumb');
-  thumb.src = `${base}thumb/${encodeURIComponent(id)}`;
+  const href = `${base}thumb/${encodeURIComponent(id)}`;
+  // The picture can trail the film itself by a moment; ask once again rather than leave the tile
+  // blank for as long as the page stays open.
+  thumb.onerror = () => {
+    if (thumb.dataset.retried) return;
+    thumb.dataset.retried = '1';
+    setTimeout(() => { thumb.removeAttribute('src'); thumb.src = href; }, 700);
+  };
+  thumb.src = href;
   thumb.alt = ''; thumb.loading = 'lazy';
   row.appendChild(thumb);
   row.appendChild(el('span', 'txt', video.name));
@@ -1200,7 +1210,18 @@ document.querySelectorAll('#ss [data-mode]').forEach(b => b.onclick = async () =
   try { take(await api('api/screensaver', { mode: b.dataset.mode })); toast(t('toast_tv_updated')); } catch (e) { toast(t('toast_set_fail')); }
 });
 /* A still of the film, made while the file is in the phone's hands: the TV's decoder will not
-   always give one (its cards stayed blank), but the browser that plays the film always can. */
+   always give one (its cards stayed blank), but the browser that plays the film always can.
+   A film's opening frames are often black — the very ones the TV's decoder fails on — so a few
+   moments into it are tried, and the first with a picture in it is the one kept. */
+const nextFrame = () => new Promise(ok => requestAnimationFrame(() => requestAnimationFrame(ok)));
+function darkFrame(ctx, c) {
+  try {
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    let light = 0;
+    for (let i = 0; i < d.length; i += 4 * 97) light += d[i] + d[i + 1] + d[i + 2];
+    return light < 40;
+  } catch (e) { return false; } // Where the pixels may not be read, keep whatever was drawn.
+}
 async function grabThumb(file) {
   const url = URL.createObjectURL(file);
   const v = document.createElement('video');
@@ -1208,18 +1229,30 @@ async function grabThumb(file) {
   try {
     await new Promise((ok, bad) => { v.onloadeddata = ok; v.onerror = () => bad(new Error('decode')); setTimeout(() => bad(new Error('slow')), 8000); });
     if (!v.videoWidth) throw new Error('no picture');
-    await new Promise(ok => {
-      v.onseeked = ok;
-      try { v.currentTime = Math.min(0.1, (v.duration || 1) / 10); } catch (e) { ok(); }
-      setTimeout(ok, 3000);
-    });
     const c = document.createElement('canvas');
     c.width = 640; c.height = Math.max(2, Math.round(640 * v.videoHeight / v.videoWidth));
-    c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const length = Number.isFinite(v.duration) ? v.duration : 0;
+    const spots = [...new Set([0.1, 0.5, Math.min(2, length / 10), length / 2].filter(n => n > 0 && Number.isFinite(n)))];
+    for (const at of spots) {
+      await new Promise(ok => {
+        v.onseeked = ok;
+        try { v.currentTime = at; } catch (e) { ok(); }
+        setTimeout(ok, 4000);
+      });
+      // Some browsers paint only on the frame after a seek settles.
+      await nextFrame();
+      ctx.drawImage(v, 0, 0, c.width, c.height);
+      if (!darkFrame(ctx, c)) break;
+    }
     const blob = await new Promise(ok => c.toBlob(ok, 'image/jpeg', 0.85));
     if (!blob) throw new Error('encode');
     return blob;
-  } finally { URL.revokeObjectURL(url); }
+  } finally {
+    URL.revokeObjectURL(url);
+    // Give the decoder back before the next film of the batch asks for it.
+    try { v.removeAttribute('src'); v.load(); } catch (e) {}
+  }
 }
 
 async function uploadVideos(e) {

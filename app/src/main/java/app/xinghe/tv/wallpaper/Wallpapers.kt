@@ -19,6 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -598,10 +599,30 @@ object Wallpapers {
      * from the phone page after a video is added or deleted, so the card appears (or goes) at once.
      */
     fun refreshVideos() {
-        if (!started) return
-        scope.launch(Dispatchers.IO) {
+        scanVideos()
+    }
+
+    /**
+     * The same rescan, waited out.
+     *
+     * The phone's page asks for each film's picture the moment the upload answers, and a card the
+     * list does not hold yet has no picture to give: `thumbnail` answers there is no such
+     * wallpaper, the picture comes back empty, and the film shows as a blank tile until the page
+     * is opened again. Called from the phone server, which may take its time here, never from the
+     * UI thread.
+     */
+    fun refreshVideosSync() {
+        runCatching { runBlocking { scanVideos()?.join() } }
+            .onFailure { Log.w(TAG, "the video rescan did not finish", it) }
+    }
+
+    private fun scanVideos(): Job? {
+        if (!started) return null
+        return scope.launch(Dispatchers.IO) {
             val videos = ScreensaverVideos.all(app)
-            scope.launch(Dispatchers.Main) {
+            // withContext, not launch: the rescan is not over until the list has been rebuilt, and
+            // a caller waiting on the job's end waits for nothing otherwise.
+            withContext(Dispatchers.Main) {
                 // Every film on its own, not just whether there are any: a second or third film
                 // uploaded while one was already listed never reached the folder (the list was
                 // only rebuilt when the folder went from empty to not, or the other way).
