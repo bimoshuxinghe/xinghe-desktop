@@ -235,6 +235,18 @@ private fun MainPage(vm: HomeViewModel, now: LocalDateTime, takeFocus: Boolean, 
             stringResource(R.string.cc_personalize),
             onClick = { vm.overlay = Overlay.Wallpaper },
         )
+        // How fast the line is, and what is running behind the screen: the two questions a slow
+        // TV raises first.
+        MenuRow(
+            Glyph.Download,
+            stringResource(R.string.cc_speed),
+            onClick = { vm.overlay = Overlay.SpeedTest },
+        )
+        MenuRow(
+            Glyph.Trash,
+            stringResource(R.string.cc_clean),
+            onClick = { vm.overlay = Overlay.Cleanup },
+        )
         // What the TV opens when switched on: easy to forget, and puzzling when it happens.
         vm.bootTargetLabel()?.let { name ->
             MenuRow(

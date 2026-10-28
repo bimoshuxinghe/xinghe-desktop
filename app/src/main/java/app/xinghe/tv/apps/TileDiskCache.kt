@@ -97,10 +97,22 @@ object TileDiskCache {
     /** Drops the files of apps no longer listed. */
     fun keepOnly(packages: Set<String>) {
         if (!::dir.isInitialized) return
-        scope.launch {
-            dir.listFiles()?.forEach { f ->
-                if (f.name.removeSuffix(".tile").removeSuffix(".tmp") !in packages) f.delete()
+        scope.launch { sweepStale(packages) }
+    }
+
+    /**
+     * Drops the files of apps no longer listed and says how many bytes that freed.
+     * Synchronous: the caller is already off the main thread and wants the number.
+     */
+    fun sweepStale(packages: Set<String>): Long {
+        if (!::dir.isInitialized) return 0
+        var freed = 0L
+        dir.listFiles()?.forEach { f ->
+            if (f.name.removeSuffix(".tile").removeSuffix(".tmp") !in packages) {
+                freed += f.length()
+                f.delete()
             }
         }
+        return freed
     }
 }

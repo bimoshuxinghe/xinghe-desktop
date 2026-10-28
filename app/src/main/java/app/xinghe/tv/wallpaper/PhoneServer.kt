@@ -17,6 +17,8 @@ import app.xinghe.tv.apps.SourceLooks
 import app.xinghe.tv.apps.TileArtFactory
 import app.xinghe.tv.settings.AerialSettings
 import app.xinghe.tv.system.Diagnostics
+import app.xinghe.tv.system.MemCleaner
+import app.xinghe.tv.system.NetSpeed
 import app.xinghe.tv.system.currentNetwork
 import app.xinghe.tv.settings.FocusStyle
 import app.xinghe.tv.weather.Weather
@@ -37,6 +39,70 @@ import java.net.Inet4Address
 import java.security.SecureRandom
 
 /**
+ * The speed test as the phone sees it: one run at a time, and the state of it at any moment.
+ *
+ * The TV's own panel asks for the same numbers, but it is a different caller on a different
+ * screen; the work is the same and each keeps its own account of it.
+ */
+private class SpeedRun {
+    @Volatile
+    var running: Boolean = false
+        private set
+
+    @Volatile
+    private var phase: String = ""
+
+    @Volatile
+    private var node: String = ""
+
+    @Volatile
+    private var doneMb: Int = 0
+
+    @Volatile
+    private var pingMs: Int = 0
+
+    @Volatile
+    private var downMbps: Double = 0.0
+
+    @Volatile
+    private var error: String? = null
+
+    fun reset() {
+        phase = ""
+        node = ""
+        doneMb = 0
+        pingMs = 0
+        downMbps = 0.0
+        error = null
+        running = true
+    }
+
+    fun step(step: NetSpeed.Step) {
+        phase = step.phase.name.lowercase()
+        node = step.node
+        doneMb = step.doneMb
+    }
+
+    fun finish(result: NetSpeed.Result) {
+        pingMs = result.pingMs
+        downMbps = result.downMbps
+        if (result.node.isNotEmpty()) node = result.node
+        error = result.error
+        phase = if (result.ok) "done" else "failed"
+        running = false
+    }
+
+    fun snapshot(): JSONObject = JSONObject()
+        .put("running", running)
+        .put("phase", phase)
+        .put("node", node)
+        .put("doneMb", doneMb)
+        .put("ping", pingMs)
+        .put("down", downMbps)
+        .put("error", error ?: "")
+}
+
+/**
  * The page a phone opens after scanning the TV's QR code: choose a wallpaper and the screensaver,
  * send photos, give an app's tile a picture of one's own, and name the weather's city. Choosing
  * pictures or typing a place with a remote is slow; with a phone it is not.
@@ -46,6 +112,9 @@ import java.security.SecureRandom
  * the QR code, so another device on the network cannot use it by guessing.
  */
 class PhoneServer private constructor(private val context: Context, private val token: String) : NanoHTTPD(PORT) {
+
+    /** The one speed test the phone may have running. */
+    private val speedRun = SpeedRun()
 
     override fun serve(session: IHTTPSession): Response {
         val prefix = "/$token"
@@ -146,6 +215,8 @@ class PhoneServer private constructor(private val context: Context, private val 
                     onMain { Weather.useNetworkLocation() }
                     json(state())
                 }
+                path == "/api/speedtest" -> speed(session)
+                path == "/api/cleanup" -> cleanup(session)
                 else -> text(Response.Status.NOT_FOUND, "Not found")
             }
         }.getOrElse {
@@ -336,11 +407,64 @@ class PhoneServer private constructor(private val context: Context, private val 
         return json(state().put("saved", saved))
     }
 
+    /**
+     * The speed test, from the phone's side.
+     *
+     * The test itself takes seconds, so it is not run inside the request: a POST starts it (or
+     * joins the one already running) and every call — the start and every poll after it — answers
+     * with the state of the run. The phone shows the steps as they come.
+     */
+    private fun speed(session: IHTTPSession): Response {
+        if (session.method == Method.POST) {
+            val run = speedRun
+            if (!run.running) {
+                run.reset()
+                // A plain thread: the run outlives the request that started it, and NanoHTTPD's
+                // worker must be free to answer the polls in the meantime.
+                Thread {
+                    val result = runBlocking { NetSpeed.measure { step -> run.step(step) } }
+                    run.finish(result)
+                }.apply { isDaemon = true }.start()
+            }
+        }
+        return json(speedRun.snapshot())
+    }
+
+    /**
+     * What runs behind the screen: the same work the TV's own panel does, with the same honesty.
+     *
+     * A GET only reports the numbers, so the phone can show them without tidying anything up; the
+     * POST does the work.
+     */
+    private fun cleanup(session: IHTTPSession): Response {
+        if (session.method != Method.POST) {
+            val memory = MemCleaner.memory(context)
+            return json(JSONObject()
+                .put("killed", 0).put("refused", 0).put("cacheMb", 0)
+                .put("background", MemCleaner.backgroundCount(context))
+                .put("memUsed", memory.usedMb)
+                .put("memTotal", memory.totalMb)
+                .put("memFree", memory.freeMb)
+                .put("low", memory.low))
+        }
+        val installed = AppCatalog.loaded.mapTo(HashSet()) { it.packageName }
+        val result = runBlocking { MemCleaner.clean(context, installed) }
+        val memory = MemCleaner.memory(context)
+        return json(JSONObject()
+            .put("killed", result.killed)
+            .put("refused", result.refused)
+            .put("cacheMb", result.cacheMb)
+            .put("background", result.background)
+            .put("memUsed", memory.usedMb)
+            .put("memTotal", memory.totalMb)
+            .put("memFree", memory.freeMb)
+            .put("low", memory.low))
+    }
+
     // NanoHTTPD writes the whole body to the cache before we see it; keep a stray or hostile
     // upload from filling the TV's storage (#57).
     private fun tooLarge(session: IHTTPSession): Boolean =
         (session.headers["content-length"]?.toLongOrNull() ?: 0L) > MAX_UPLOAD
-
     private fun form(session: IHTTPSession): Map<String, String> {
         session.parseBody(HashMap())
         return session.parameters.mapValues { it.value.firstOrNull().orEmpty() }
