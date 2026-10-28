@@ -28,6 +28,8 @@ app/src/main/java/app/xinghe/tv/
 │   ├── home/FolderView.kt   打开的文件夹
 │   ├── home/PinPad.kt       家长密码键盘（设置 / 解锁，遥控器数字键或屏幕键盘）
 │   ├── home/Screensaver.kt  屏保 UI：航拍（Media3 ExoPlayer，见 wallpaper/AerialStream.kt）/ 照片（Ken Burns）/ 时钟
+│   ├── home/VideoSaver.kt   本地视频屏保：自研播放器（media/LocalFilmPlayer），无音轨、无预读
+│   ├── home/LiveWallpaper.kt 动态壁纸：航拍（ExoPlayer）或本地视频（LocalFilmPlayer），播放器抽象见 media/FilmPlayer.kt
 │   ├── control/ControlCenter.kt  控制中心：按钮、音量/亮度滑块、「个性化」入口、有新版本时的提示和升级说明页、底部版本号；信号源页（只负责切换）和信号源设置页（显示在主屏幕、开机时打开）
 │   └── wallpaper/WallpaperSheet.kt  个性化面板（壁纸、屏保和开始时间、焦点样式、家长密码、天气）+ 手机扫码卡片
 ├── wallpaper/
@@ -38,6 +40,11 @@ app/src/main/java/app/xinghe/tv/
 │   └── PhoneServer.kt       NanoHTTPD 手机配置页 + 二维码生成
 ├── settings/
 │   └── AerialSettings.kt    Aerial 自己的偏好（SharedPreferences "settings"）：焦点样式 FocusStyle（默认高对比度）、固定到主屏幕的信号源、开机信号源、屏保开始时间、家长密码（SHA-256，解锁 10 分钟或按 HOME 重新上锁）
+├── media/
+│   ├── FilmPlayer.kt         播放器抽象：壁纸 UI 只认这一个接口，换播放器不改 UI
+│   ├── ExoFilmPlayer.kt      Media3 ExoPlayer 的适配层（网络航拍）
+│   ├── LocalFilmPlayer.kt    本地视频播放器：MediaExtractor + MediaCodec，零第三方依赖、零音轨、零预读
+│   └── FilmDecoder.kt        这一台电视只有一条视频解码通路：谁拿着它要登记，别人要用得先问
 ├── update/
 │   └── Updates.kt           每 3 小时读一次官网 download/version.txt，有新版时控制中心提示；点「下载并安装」才下载 APK 并交给系统安装器（见「升级」）
 ├── weather/
@@ -149,6 +156,36 @@ Logo 的大小统一：先在 256×256 的采样里找出 Logo 的范围，再�
 - 航拍：`assets/aerials.json` 只含地址和地名，影片实时从 `sylvan.apple.com` 播放，用 Media3 ExoPlayer（#46，`AerialStream`）：全部影片放进一个播放列表，下一段提前加载；连接 5 秒、读取 8 秒超时，只重试一次。`sylvan.apple.com` 的证书链到 Apple Root CA，Android 自带的根证书里没有，`network_security_config.xml` 只对这个域名信任打包的 `raw/apple_root_ca.pem`；Android 5、6 不读这个配置，一开始就走 HTTP。8 秒没画面就换下一段，失败 3 次换照片屏保；这次屏保一帧都没播出来时，2 次就换。播放时把下一次屏保第一段影片的开头和索引预取到磁盘（缓存上限 48MB），下次几乎秒开。小米 MFTR0 实测冷启动 1.3 秒出第一帧。
 - 航拍画质（个性化 → 屏幕保护程序，`AerialSettings.aerialQuality`，#198 #217）：自动 / 1080p（H.264，约 10 Mbps）/ 4K（HEVC SDR，约 12 Mbps）/ 4K 杜比视界（约 24 Mbps）。`AerialFormats` 只问解码器和屏幕：电视的界面大多是 1080p（MFTR0 只报一个 1920×1080 模式），问不出面板是不是 4K。有能解 3840×2160@30 的 HEVC 解码器就能选 4K；Apple 的 HDR 文件是杜比视界 profile 5（dvcC 里 `dvhe.05.07`，没有 HDR10 基础层，别的解码器解出来是绿紫色），所以要有支持 `DolbyVisionProfileDvheStn` 到 `LevelUhd30` 的解码器、并且屏幕的 HdrCapabilities 里有杜比视界，才算支持。「自动」选能播的最高一档；这台电视只能 1080p 时不显示这一项。解码器报错（4001–4005）时这一段降一档重播，本进程以后都从低一档开始。缓存键带画质（`id@dolby_vision`），4K 的缓冲目标加到 32/48MB。小米 MFTR0 实测：自动选杜比视界，用 `OMX.MS.DOLBY_VISION.DVHE.STN.Decoder`，1.06 秒出第一帧、颜色正常；4K 用 `OMX.MS.HEVC.Decoder`，0.82 秒。
 - 航拍壁纸（壁纸行第一张「航拍」，`Wallpapers.LIVE`，`ui/home/LiveWallpaper.kt`，#216）：停在主屏幕第一排 10 秒没按键，影片在磁贴后面播放（SurfaceView 在窗口下面，`HomeBackground` 的 `cover` 让图片和玻璃底板淡出，播放时 Compose 不画全屏内容）；任何按键、进网格、打开浮层或离开 Aerial 就暂停，这一帧成为壁纸图片（`Wallpapers.useLiveFrame`：照常压暗、做毛玻璃，存成 `files/live-frame.jpg`，下次启动也用它），玻璃底板和网格背景都跟着它；再停 10 秒从这一帧接着播。取到帧时把片子和时间点记在 `wallpaper` 偏好里（`Wallpapers.liveSpot`），播放器释放或重启后也从这一片、这一刻开始（`setMediaItems(…, 0, at)`），静态图和影片的第一帧是同一画面，看起来是一个镜头；没取到帧时不更新，图片和位置仍然对得上。暂停后 2 分钟释放播放器；屏保类型是航拍、屏保出现时影片正在显示（`cover` > 0.5），或焦点在第一排、没有浮层（影片停在静态帧上，比如按返回键），不另开播放器，而是接着放这段影片（静态时从这一帧开始动；10 秒内没动起来就交给屏保自己的影片，`FILM_SAVER_WAIT_MS`）（`HomeScreen` 的 `filmSaver`，`LiveWallpaper.hold`）：磁贴从左到右依次淡出、略往下沉，状态按钮、日期、天气淡出，时间从主屏幕的位置移动并缩放到屏保时钟的位置（`HomeChrome.toSaverClock`，2 秒 `Motion.EaseInOut`），`Screensaver` 只加地点字幕（`FilmLabels`，左右键切片）；按键唤醒时 380ms 收回，影片照常停在这一帧做壁纸。屏保没选过时跟随壁纸（`Wallpapers.screensaver` 由 `chosenScreensaver` 和壁纸算出来，`screensaverFollows`）：航拍壁纸和「跟随 App」配航拍，图片壁纸配照片，并从这张壁纸开始（`screensaverPicture`）；选过一次就固定，没有单独的「跟随」选项。新安装存 `follow`；1.38 之前就在用、没存过选择的存 `aerial`，保持原来的默认（`firstScreensaver`，看 `firstInstallTime == lastUpdateTime`），以后升级不变；1.38 测试版里的「壁纸」类型读成 `follow`。个性化和手机页在跟随时显示说明。照片屏保在第一排、没有浮层、壁纸是图片时一镜到底（`HomeScreen.stillSaver`、`SaverCarry.Still`）：不压暗的原图画在 `HomeBackground` 的图片和底板之间，从和主屏幕一样的构图开始 1.8 秒淡入（压暗退掉）并慢慢推近（`drawIn`：60 秒放大 8% 并向右漂 24dp，再 60 秒回来），底板跟着 `toSaver` 淡出，磁贴和时钟同航拍；18 秒后 `PhotoSaver` 从下一张接着轮播，盖住后主屏幕的图停止绘制（`covered`），屏保自己的时间在主屏幕时钟移到的位置淡入。左右键照常切换。唤醒时 380ms 缩回、压暗回来。单独出现的照片屏保（系统屏保、网格里）也从当前壁纸开始。其他情况（在网格里、类型是照片或时钟）还是原来的黑底淡入。影片停下时底板要和磁贴一起回来：PixelCopy 读不到视频的电视（小米 MFTR0）上，`FrameReader` 在影片开始播放时就用 MediaMetadataRetriever 打开这段片子的 1080p 文件（打开连 Apple、读文件末尾的索引，0.9–1.5 秒，以前每次停下才做，所以要 2.4–6.6 秒），播放中定时取 320×180 的关键帧小图（`GlassSample`，`OPTION_PREVIOUS_SYNC`，约 0.4–0.6 秒，小米实测播放 0 掉帧）。停下时用最近的小图马上做磨砂（`Wallpapers.useLiveFrost`），底板直接画在暂停的影片上（`HomeBackground.filmStopped`，`LiveFilm.stopped`），同时画上静态图会有的压暗（`Images.SHADE`）。`HomeBackground` 分三层：压暗（在图片下面）、图片（换壁纸时交叉淡入）、底板（`Plate`，只有一层）。底板只在影片动起来时让位，所以影片交给静态图时不透明度一直是 1（以前底板放在图片的交叉淡入里，暂停时的底板和图片的底板两层各半透明地交接，中间会透出视频，放大量也跟着变，看起来在闪）；换磨砂时旧的保持不透明，新的在上面淡入；底板看不见时直接换（影片刚停下时，否则会闪出上一次停下的画面颜色），`glassReady` 等两帧再让底板出现。小米实测（临时日志）：唤醒后约 0.3 秒出现，之后到静态图换上，底板不透明度一直是 1.000。然后在后台解精确帧（`OPTION_CLOSEST`，0.4–2.8 秒）做成壁纸图片（磨砂、网格背景、下次启动都用它），但屏幕上不换：暂停的影片继续当壁纸，10 秒没按键就从这一帧接着动；只有打开浮层（控制中心等，影片不在窗口里，得不到模糊）、离开 Aerial、进普通屏保，或停了 `KEEP_STOPPED_MS` 之后，才换成图片（`standIn`）。以前解出来就换，图片和视频不在同一个显示层、画质处理不同，时间点也可能差一两帧，从屏保回来时桌面会轻微一闪、错位。小图第一张在开始播放 0.8 秒后取，之后每 2.5 秒一张。精确帧要从前一个关键帧顺序读解，暂停的播放器还在缓冲时曾超时（`FrameDecoder: Timed-out waiting`），这时退一步用最近的关键帧（`OPTION_CLOSEST_SYNC`），最多差一两秒的镜头移动；都失败才退回上一张图片并换回原来的磨砂。第一次停下时先试 PixelCopy，本进程记住结果（`pixelCopy`）：读不到（小米 MFTR0）以后就不再试；读得到（TCL MT5879）就不再打开文件、也不取小图。屏保出现（不接着放时）或打开别的 App 时立刻释放、不取帧：暂停的播放器仍占着解码器，小米 MFTR0 的屏保因此拿不到解码资源（`vdec resource lost`），1.32 上屏保会降成 1080p，1.33 修好。取帧先用 PixelCopy；小米 MFTR0（MStar）的视频在硬件图层上，PixelCopy 拿到全黑，就用 MediaMetadataRetriever 从同一段的 1080p 文件解出同一时间点（`OPTION_CLOSEST`），实测 1.4 到 3.6 秒，这段时间画面停在暂停的视频上，网格背景先用旧的毛玻璃。最多 4K SDR：电视切进杜比视界模式后，叠在上面的界面也会按杜比的画面设置显示。小米 MFTR0 实测：播放时 Compose 几乎不出帧，左右移动焦点中位 19ms（和静态壁纸一样）。
+
+## 播放器
+
+壁纸和屏保要放影片，但**本地视频和网络航拍用两套播放器**（`media/`）：
+
+- `FilmPlayer`：壁纸 UI 只认这一个接口（位置、当前片、是否在放、让出解码器、跳片、挂 Surface）。换播放器不改 UI。
+- `ExoFilmPlayer`：网络航拍走 Media3 ExoPlayer（`wallpaper/AerialStream`）。它要磁盘缓存（SimpleCache 48MB）、播放列表、moov 在文件尾要预取（HEAD 8MB + TAIL 1MB），而且电视上自带的 MediaPlayer 是厂商魔改的 NuPlayer 分支（小米 MFTR0 重试 10 次、34 秒），所以网络这条留着 ExoPlayer。
+- `LocalFilmPlayer`：**本地视频**（视频壁纸、视频屏保）用它自研的极简播放器——`MediaExtractor` 读文件、`MediaCodec` 解码、帧直接送 Surface，零第三方依赖。不选音轨（没有 AudioTrack，不碰系统音频通路）、不预读（ExoPlayer 默认目标缓冲 125MB，会把整片读进内存）、只有一个工作线程。
+
+为什么本地这条要换掉：ExoPlayer 的默认 LoadControl 会把整片读进内存，而且没禁音轨（建 AudioTrack，电视上极易全局卡顿）；视频壁纸在「全部应用」网格页是继续播的（`HomeScreen` 里 `Wallpapers.videoSelected` 使 `moving` 成立），于是 ExoPlayer 的开销让**整个网格页掉帧**。换成自研播放器后，网格页后面跑的是一条线程 + 一个解码器，没有音频通路、没有内存缓冲。
+
+本地播放器自己处理的事：旋转（`MediaMetadataRetriever` 读 `METADATA_KEY_VIDEO_ROTATION`，写进 MediaFormat 的 `rotation-degrees`，和 ExoPlayer 一样）、裁剪（`crop-left/right/top/bottom`）、缩放模式（`MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING`，视频壁纸用）、片尾循环、失败重试（前两次 800ms、第三次起 4s，永不放弃）、单解码器约束。
+
+### 一台电视，一个解码器
+
+这些电视只有一条视频解码通路：在壁纸旁边再开一个解码器，壁纸就停在原地不动了（`media/FilmDecoder`）。播放器在开始解码时登记、释放时注销，谁要用这条通路先问：
+
+- `letGo()` / `goOn()`：壁纸把解码器让出去一会儿（给屏保），再从原处接着放。
+- `Wallpapers.borrowDecoder`：需要临时借用时注册的钩子——Home 的影片先 `letDecoderGo()`，借用方做完（在别的线程上），再 `goOn()`。壁纸只会停下几百毫秒，画面停在最后一帧，五百毫秒后继续。
+
+### 每个视频都要有自己的一张图
+
+卡片和手机页要显示影片的画面，来源按优先级是：
+
+1. **手机上传时一起发来的缩略图**（浏览器解码出来的，`<视频目录>/thumb.jpg`）——但手机的浏览器并不能解每一种影片，很多传上来是空的。
+2. **电视自己解的首帧**（`MediaMetadataRetriever`，六种问法试到其中一个成，片头全黑的话往片中再取一次），解码一次存成 JPEG（`video-frames/`）。
+3. 被选作壁纸播放过之后，停下的那一帧（`video-frame.jpg`）。
+
+以前只有 1 和 3：一批里第二个以后的影片常常两个都没有——手机没带来图，电视又因为解码器被壁纸占着没法自己解，于是格子一直是空的（1.6.0）。现在 `Wallpapers.catchUpFrames()` 会主动补齐：启动时（还没有任何影片在播，解码器一定空着）、上传之后（`requestFrames` 往后重试四轮）、每次重扫之后。实在碰上壁纸正在播，就向它借半个解码器的一瞬（上一条）。
+
 
 ## 手机配置（PhoneServer）
 

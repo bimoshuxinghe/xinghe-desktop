@@ -8,8 +8,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -18,15 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.net.toUri
-import androidx.media3.common.C
-import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
-import androidx.media3.common.VideoSize
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultLoadControl
-import androidx.media3.exoplayer.ExoPlayer
+import app.xinghe.tv.media.LocalFilmPlayer
 import app.xinghe.tv.system.DiagLog
 import app.xinghe.tv.wallpaper.ScreensaverVideo
 import app.xinghe.tv.wallpaper.ScreensaverVideos
@@ -50,75 +42,67 @@ internal fun VideoSaver(steps: SharedFlow<Int>, onUnavailable: () -> Unit) {
     LocalFilms(loaded, steps, onUnavailable)
 }
 
-@androidx.annotation.OptIn(UnstableApi::class)
-@Composable
-private fun LocalFilms(films: List<ScreensaverVideo>, steps: SharedFlow<Int>, onUnavailable: () -> Unit) {
-    val context = LocalContext.current
-    val player = remember {
-        ExoPlayer.Builder(context).setLoadControl(
-            DefaultLoadControl.Builder().setTargetBufferBytes(12 * 1024 * 1024)
-                .setBufferDurationsMs(5_000, 15_000, 500, 1_000).build(),
-        ).build().apply {
-            volume = 0f
-            trackSelectionParameters = trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
-            repeatMode = Player.REPEAT_MODE_ALL
-            videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT
+/**
+ * The films on a loop, played by the platform's own machinery (app/xinghe/tv/media/LocalFilmPlayer):
+ * no library, no audio track and nothing read ahead, which is all a silent screensaver needs.
+ */
+private class FilmRun(films: List<ScreensaverVideo>, private val onUnavailable: () -> Unit) {
+    val player = LocalFilmPlayer()
+
+    var attempt by mutableIntStateOf(0)
+    var playing by mutableStateOf(false)
+    var aspect by mutableFloatStateOf(16f / 9f)
+
+    init {
+        player.onFirstFrame = { item ->
+            playing = true
+            DiagLog.i("local screensaver first frame: ${item.id}")
         }
+        player.onItemChanged = { _, _ ->
+            playing = false
+            attempt++
+        }
+        player.onSize = { _, w, h ->
+            if (w > 0 && h > 0) aspect = w.toFloat() / h.toFloat()
+        }
+        player.onError = { item, why ->
+            DiagLog.i("local screensaver failed: ${item.id} ($why)")
+            failed()
+        }
+        player.setPlaylist(films.map { LocalFilmPlayer.Item(it.id, it.file) })
     }
-    var attempt by remember { mutableIntStateOf(0) }
-    var playing by remember { mutableStateOf(false) }
-    var aspect by remember { mutableFloatStateOf(16f / 9f) }
 
     fun skip(step: Int) {
-        if (player.mediaItemCount == 0) return
-        if (step < 0) player.seekToPreviousMediaItem() else player.seekToNextMediaItem()
-        if (player.playbackState == Player.STATE_IDLE) player.prepare()
+        if (player.count == 0) return
+        player.skip(step)
     }
+
     fun failed() {
         playing = false
-        if (player.mediaItemCount <= 1) { onUnavailable(); return }
+        if (player.count <= 1) { onUnavailable(); return }
         // Only this session's queue changes. Never delete a film because one decoder rejected it.
-        player.removeMediaItem(player.currentMediaItemIndex)
-        player.prepare()
+        player.removeCurrent()
         attempt++
     }
-    DisposableEffect(player) {
-        val listener = object : Player.Listener {
-            override fun onRenderedFirstFrame() {
-                playing = true
-                DiagLog.i("local screensaver first frame: ${player.currentMediaItem?.mediaId}")
-            }
-            override fun onVideoSizeChanged(videoSize: VideoSize) {
-                if (videoSize.width > 0 && videoSize.height > 0) aspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
-            }
-            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                if (reason != Player.MEDIA_ITEM_TRANSITION_REASON_AUTO) playing = false
-                attempt++
-            }
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_BUFFERING) playing = false
-                else if (playbackState == Player.STATE_READY && player.isPlaying) playing = true
-            }
-            override fun onPlayerError(error: PlaybackException) {
-                DiagLog.i("local screensaver failed: ${error.errorCodeName}")
-                failed()
-            }
-        }
-        player.addListener(listener)
-        player.setMediaItems(films.map { MediaItem.Builder().setUri(it.file.toUri()).setMediaId(it.id).build() })
-        player.prepare()
-        player.playWhenReady = true
-        onDispose { player.removeListener(listener); player.release() }
+}
+
+@Composable
+private fun LocalFilms(films: List<ScreensaverVideo>, steps: SharedFlow<Int>, onUnavailable: () -> Unit) {
+    val run = remember { FilmRun(films, onUnavailable) }
+    DisposableEffect(run) {
+        run.player.prepare()
+        run.player.play()
+        onDispose { run.player.release() }
     }
-    LaunchedEffect(steps) { steps.collect { skip(it) } }
-    LaunchedEffect(attempt, playing) {
-        if (!playing) { delay(8_000); failed() }
+    LaunchedEffect(steps) { steps.collect { run.skip(it) } }
+    LaunchedEffect(run.attempt, run.playing) {
+        if (!run.playing) { delay(8_000); run.failed() }
     }
     Box(Modifier.fillMaxSize()) {
         AndroidView(
-            modifier = Modifier.align(Alignment.Center).aspectRatio(aspect),
-            factory = { ctx -> SurfaceView(ctx).also { player.setVideoSurfaceView(it) } },
-            onRelease = { player.clearVideoSurfaceView(it) },
+            modifier = Modifier.align(Alignment.Center).aspectRatio(run.aspect),
+            factory = { ctx -> SurfaceView(ctx).also { run.player.setSurfaceView(it) } },
+            onRelease = { run.player.setSurfaceView(null) },
         )
     }
 }

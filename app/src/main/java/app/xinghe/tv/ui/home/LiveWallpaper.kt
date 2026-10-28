@@ -1,8 +1,8 @@
 package app.xinghe.tv.ui.home
 
 import android.graphics.Bitmap
+import android.media.MediaCodec
 import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -25,11 +25,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.core.graphics.createBitmap
-import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
+import app.xinghe.tv.media.ExoFilmPlayer
+import app.xinghe.tv.media.FilmPlayer
+import app.xinghe.tv.media.LocalFilmPlayer
+import java.util.concurrent.CountDownLatch
 import app.xinghe.tv.system.DiagLog
 import app.xinghe.tv.ui.theme.Motion
 import app.xinghe.tv.wallpaper.Aerial
@@ -61,22 +63,24 @@ private const val KEEP_STOPPED_MS = 2 * 60 * 1000L
  */
 class LiveFilm {
     var film by mutableStateOf<Aerial?>(null); internal set
-    internal var player: ExoPlayer? = null
+    internal var player: FilmPlayer? = null
 
     /**
      * Stopped on a frame that is not yet the wallpaper's picture, with the glass for it ready
      * (Wallpapers.useLiveFrost): the paused film is what shows, and the plate stands over it.
      */
     var stopped by mutableStateOf(false); internal set
-    val positionMs: Long get() = player?.currentPosition ?: 0L
+    val positionMs: Long get() = player?.positionMs ?: 0L
 
     fun skip(step: Int) {
-        val p = player ?: return
-        if (step < 0) p.seekToPreviousMediaItem() else p.seekToNextMediaItem()
+        player?.skip(step)
     }
 
     /** The film and the moment showing now, while a player has it. */
     fun spot(): Pair<String, Long>? = film?.id?.takeIf { player != null }?.let { it to positionMs }
+
+    /** Whether the decoder has been lent out to someone else for the moment ([borrow]). */
+    @Volatile private var lending = false
 
     /**
      * Lets the decoder go, keeping the film and its place: these TVs have one 4K decoder, and a
@@ -84,13 +88,42 @@ class LiveFilm {
      * beside the wallpaper's). The film plays again from here when Home asks for it.
      */
     fun letDecoderGo() {
-        player?.run { pause(); stop() }
+        if (lending) return
+        player?.letGo()
     }
 
     /** After [letDecoderGo], when nothing else came to need it: the film goes on. */
     fun goOn() {
-        player?.run { if (playbackState == Player.STATE_IDLE) prepare(); play() }
+        if (lending) return
+        player?.goOn()
     }
+
+    /**
+     * Runs [work], off the main thread, with the decoder let go for the moment, then asks for it
+     * back: a film that has just been uploaded wants a picture of itself, and making one takes a
+     * few hundred milliseconds — a fair bargain for a card that would otherwise stay empty, and
+     * nothing at all when no film is playing here.
+     */
+    @Synchronized
+    fun borrow(work: () -> Unit) {
+        Thread {
+            val let = CountDownLatch(1)
+            lending = true
+            main.post { letDecoderGo(); let.countDown() }
+            let.await()
+            try {
+                // The renderer gives the codec up a moment after it is asked to, and the picture
+                // asked of a decoder still in the way of another comes back nothing.
+                Thread.sleep(150)
+                work()
+            } finally {
+                lending = false
+                main.post { goOn() }
+            }
+        }.apply { isDaemon = true; name = "aerial-decoder-loan" }.start()
+    }
+
+    private val main = Handler(Looper.getMainLooper())
 
     companion object {
         /** Home's film, for MainActivity to hand the moment on to a screensaver it starts elsewhere. */
@@ -110,6 +143,7 @@ class LiveFilm {
  * and the frame budget is the same as on a still Home. Kept to SDR even where the screensaver plays
  * Dolby Vision: a TV in Dolby Vision mode shows the tiles over it with Dolby's picture settings.
  */
+@androidx.media3.common.util.UnstableApi
 @Composable
 fun LiveWallpaper(
     moving: Boolean,
@@ -124,7 +158,7 @@ fun LiveWallpaper(
     live: LiveFilm,
 ) {
     val context = LocalContext.current
-    var player by remember { mutableStateOf<ExoPlayer?>(null) }
+    var player by remember { mutableStateOf<FilmPlayer?>(null) }
     // Which wallpaper selection the player was opened for: the aerial films and the owner's videos
     // need different players, so a change of selection rebuilds it.
     var openedFor by remember { mutableStateOf<String?>(null) }
@@ -159,7 +193,7 @@ fun LiveWallpaper(
     }
 
     /** The owner's chosen video (ScreensaverVideos): one local file, looping muted behind Home. */
-    fun openLocal(): ExoPlayer {
+    fun openLocal(): FilmPlayer {
         val videos = ScreensaverVideos.all(context)
         // The chosen one, on its own: no taking turns. Where its picture came from, pick up there.
         val spot = Wallpapers.liveSpot()
@@ -167,52 +201,29 @@ fun LiveWallpaper(
             ?: videos.firstOrNull { "local:${it.id}" == spot?.first }
             ?: videos.firstOrNull()
         DiagLog.i("video wallpaper: ${chosen?.name ?: "no video on hand"}")
-        var failures = 0
-        return ExoPlayer.Builder(context).build().apply {
-            volume = 0f
-            repeatMode = Player.REPEAT_MODE_ALL
-            videoScalingMode = C.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING
-            addListener(object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    showing = isPlaying
-                    failures = 0
-                }
-
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    showing = isPlaying
-                }
-
-                override fun onPlayerError(error: PlaybackException) {
-                    DiagLog.i("video wallpaper failed (${error.errorCodeName})")
-                    // Three quick tries, then one every few seconds — never a give-up: the decoder
-                    // can be held for a while by whoever needs it (a screensaver, a first frame
-                    // asked for somewhere else), and the film is to come back on its own once the
-                    // way is free, without a key press having to wake it.
-                    if (++failures >= 3) {
-                        failures = 0
-                        Handler(Looper.getMainLooper()).postDelayed({
-                            if (playbackState == Player.STATE_IDLE) runCatching { prepare() }
-                        }, 4_000)
-                        return
-                    }
-                    prepare()
-                }
-            })
-            if (chosen != null) {
-                val at = if ("local:${chosen.id}" == spot?.first) spot.second else 0L
-                setMediaItems(
-                    listOf(MediaItem.Builder().setUri(Uri.fromFile(chosen.file)).setMediaId("local:${chosen.id}").build()),
-                    0,
-                    at,
-                )
-                surface?.let { setVideoSurfaceView(it) }
-                prepare()
-            }
-            live.player = this
+        val local = LocalFilmPlayer(MediaCodec.VIDEO_SCALING_MODE_SCALE_TO_FIT_WITH_CROPPING)
+        local.onFirstFrame = { showing = true }
+        local.onError = { item, why ->
+            DiagLog.i("video wallpaper failed ($why)")
+            // The player never gives up on its own: it tries again in a moment, and slower after
+            // a few goes, because the decoder can be held for a while by whoever needs it (a
+            // screensaver, a first frame asked for somewhere else), and the film is to come back
+            // on its own once the way is free, without a key press having to wake it.
+            showing = false
         }
+        if (chosen != null) {
+            val at = if ("local:${chosen.id}" == spot?.first) spot.second else 0L
+            local.setPlaylist(listOf(LocalFilmPlayer.Item("local:${chosen.id}", chosen.file)))
+            local.seekTo(at)
+        }
+        surface?.let { local.setSurfaceView(it) }
+        local.prepare()
+        live.player = local
+        return local
     }
 
-    fun openAerial(): ExoPlayer {
+    @androidx.media3.common.util.UnstableApi
+    fun openAerial(): FilmPlayer {
         val quality = AerialFormats.forWallpaper(context)
         val overHttp = Build.VERSION.SDK_INT < Build.VERSION_CODES.N
         val all = Aerials.all(context).shuffled()
@@ -222,39 +233,41 @@ fun LiveWallpaper(
         val films = if (resume != null) listOf(resume) + (all - resume) else AerialStream.withOpenerFirst(context, all, quality)
         var failures = 0
         var rendered = false
-        return AerialStream.player(context, quality).apply {
-            addListener(object : Player.Listener {
-                override fun onRenderedFirstFrame() {
-                    rendered = true
-                    showing = isPlaying
-                    failures = 0
-                }
+        val exo = AerialStream.player(context, quality)
+        exo.addListener(object : Player.Listener {
+            override fun onRenderedFirstFrame() {
+                rendered = true
+                showing = exo.isPlaying
+                failures = 0
+            }
 
-                override fun onIsPlayingChanged(isPlaying: Boolean) {
-                    showing = isPlaying && rendered
-                }
+            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                showing = isPlaying && rendered
+            }
 
-                override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-                    live.film = films.firstOrNull { it.id == mediaItem?.mediaId }
-                }
+            override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+                live.film = films.firstOrNull { it.id == mediaItem?.mediaId }
+            }
 
-                override fun onPlayerError(error: PlaybackException) {
-                    DiagLog.i("wallpaper film failed (${error.errorCodeName})")
-                    // Three in a row: Apple's host is out of reach; the picture stays as it is.
-                    if (++failures >= 3) return
-                    seekToNextMediaItem()
-                    prepare()
-                }
-            })
-            setMediaItems(films.map { AerialStream.mediaItem(it, quality, overHttp) }, 0, if (resume != null) spot?.second ?: 0L else 0L)
-            surface?.let { setVideoSurfaceView(it) }
-            prepare()
-            live.player = this
-            live.film = films.first()
-        }
+            override fun onPlayerError(error: PlaybackException) {
+                DiagLog.i("wallpaper film failed (${error.errorCodeName})")
+                // Three in a row: Apple's host is out of reach; the picture stays as it is.
+                if (++failures >= 3) return
+                exo.seekToNextMediaItem()
+                exo.prepare()
+            }
+        })
+        exo.setMediaItems(films.map { AerialStream.mediaItem(it, quality, overHttp) }, 0, if (resume != null) spot?.second ?: 0L else 0L)
+        surface?.let { exo.setVideoSurfaceView(it) }
+        exo.prepare()
+        val film = ExoFilmPlayer(exo)
+        live.player = film
+        live.film = films.first()
+        return film
     }
 
-    fun open(): ExoPlayer {
+    @androidx.media3.common.util.UnstableApi
+    fun open(): FilmPlayer {
         openedFor = Wallpapers.selectedId
         return if (Wallpapers.videoSelected) openLocal() else openAerial()
     }
@@ -272,11 +285,18 @@ fun LiveWallpaper(
         while (showing) {
             delay(wait)
             wait = GLASS_EVERY_MS
-            val at = player?.currentPosition ?: break
+            val at = player?.positionMs ?: break
             reader.frame(id, at, 320, 180, exact = false, quiet = true)?.let { glassSample = GlassSample(id, at, it) }
         }
     }
 
+    // The surface comes with the view, which the composition makes before the player is opened:
+    // whenever one is there and a player is up, the two are tied together.
+    LaunchedEffect(surface, player) {
+        val p = player ?: return@LaunchedEffect
+        val v = surface ?: return@LaunchedEffect
+        p.setSurfaceView(v)
+    }
     // Keyed on the selection too: switching between the aerial films and the owner's videos while
     // playing must rebuild the player, whose playlist comes from somewhere else.
     LaunchedEffect(play, Wallpapers.selectedId) {
@@ -285,10 +305,10 @@ fun LiveWallpaper(
             // The selection changed while a player was up: it plays the other playlist, so rebuild.
             if (player != null && openedFor != Wallpapers.selectedId) release()
             val p = player ?: open().also { player = it }
-            DiagLog.i("wallpaper film starts (state ${p.playbackState}, ${p.currentMediaItem?.mediaId} at ${p.currentPosition} ms)")
+            DiagLog.i("wallpaper film starts (idle ${p.isIdle}, ${p.currentId} at ${p.positionMs} ms)")
             // Its decoder was let go for the screensaver (LiveFilm.letDecoderGo).
-            if (p.playbackState == Player.STATE_IDLE) p.prepare()
-            p.playWhenReady = true
+            if (p.isIdle) p.prepare()
+            p.play()
             snapshotFlow { showing }.first { it }
             DiagLog.i("wallpaper film moving")
             cover.animateTo(1f, tween(1200, easing = Motion.EaseOut))
@@ -318,11 +338,11 @@ fun LiveWallpaper(
                 // the video plane cannot be read, the same moment is decoded from the 1080p file:
                 // first the key frame before it, small, which is all the glass needs, so the plate
                 // is back with the apps; then the exact frame, which looks just like the paused film.
-                val film = p.currentMediaItem?.mediaId
-                val at = p.currentPosition
+                val film = p.currentId
+                val at = p.positionMs
                 val w = surface?.width ?: Wallpapers.screenW
                 val h = surface?.height ?: Wallpapers.screenH
-                p.videoDecoderCounters?.let { DiagLog.i("wallpaper film dropped ${it.droppedBufferCount} of ${it.renderedOutputBufferCount + it.droppedBufferCount} frames") }
+                p.droppedFrames?.let { DiagLog.i("wallpaper film dropped $it") }
                 val before = Wallpapers.frosted
                 glassSample?.takeIf { it.film == film && abs(it.atMs - at) <= GLASS_EVERY_MS * 2 }?.let {
                     Wallpapers.useLiveFrost(it.frame)
@@ -378,8 +398,8 @@ fun LiveWallpaper(
 
     AndroidView(
         modifier = Modifier.fillMaxSize(),
-        factory = { ctx -> SurfaceView(ctx).also { surface = it; player?.setVideoSurfaceView(it) } },
-        onRelease = { player?.clearVideoSurfaceView(it); surface = null },
+        factory = { ctx -> SurfaceView(ctx).also { surface = it; player?.setSurfaceView(it) } },
+        onRelease = { player?.setSurfaceView(null); surface = null },
     )
 }
 

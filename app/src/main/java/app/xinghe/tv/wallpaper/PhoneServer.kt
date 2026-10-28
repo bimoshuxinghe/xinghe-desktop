@@ -16,6 +16,7 @@ import app.xinghe.tv.apps.SourceDevice
 import app.xinghe.tv.apps.SourceLooks
 import app.xinghe.tv.apps.TileArtFactory
 import app.xinghe.tv.settings.AerialSettings
+import app.xinghe.tv.system.DiagLog
 import app.xinghe.tv.system.Diagnostics
 import app.xinghe.tv.system.MemCleaner
 import app.xinghe.tv.system.NetSpeed
@@ -126,7 +127,9 @@ class PhoneServer private constructor(private val context: Context, private val 
                 path == "/" -> newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", page())
                 path == "/api/state" -> json(state())
                 path == "/api/diagnostics" -> text(Response.Status.OK, Diagnostics.report(context))
-                path.startsWith("/thumb/") -> thumb(path.removePrefix("/thumb/"))
+                // Asked again with something after the name ("?again=2") to get past the browser's
+                // keeping of an empty answer: what follows the name is not part of it.
+                path.startsWith("/thumb/") -> thumb(path.removePrefix("/thumb/").substringBefore("?"))
                 session.method == Method.POST && path == "/api/wallpaper" -> {
                     val id = form(session)["id"].orEmpty()
                     onMain { Wallpapers.select(id) }
@@ -154,7 +157,7 @@ class PhoneServer private constructor(private val context: Context, private val 
                     Wallpapers.refreshVideosSync()
                     json(state().put("removed", removed))
                 }
-                path.startsWith("/tile/") -> tile(java.net.URLDecoder.decode(path.removePrefix("/tile/"), "UTF-8"))
+                path.startsWith("/tile/") -> tile(java.net.URLDecoder.decode(path.removePrefix("/tile/").substringBefore("?"), "UTF-8"))
                 session.method == Method.POST && path == "/api/icon" -> icon(session)
                 session.method == Method.POST && path == "/api/source/name" -> {
                     val f = form(session)
@@ -399,11 +402,23 @@ class PhoneServer private constructor(private val context: Context, private val 
         // The frame the phone's browser made of the film rides along with it: that browser decodes
         // what the TV's retriever will not, and the TV opens no second decoder to try.
         val thumb = files["thumb"]?.let(::File)?.takeIf { it.exists() && it.length() > 0 }
-        val saved = ScreensaverVideos.add(context, File(path), name, thumb) != null
+        val video = ScreensaverVideos.add(context, File(path), name, thumb)
+        val saved = video != null
+        DiagLog.i("video upload: $name, ${path.let { File(it).length() / 1024 }} KB, " +
+            "part names ${files.keys}, thumbnail ${thumb?.length() ?: 0} bytes, saved $saved")
         // Waited out, not merely started: the phone asks for the new film's thumbnail the moment
         // this answers, and until the list has been rescanned there is no such wallpaper to take a
         // picture of — the tile stayed blank whichever way the film was sent (1.6.0).
         Wallpapers.refreshVideosSync()
+        if (video != null) {
+            val owes = File(video.file.parentFile, "thumb.jpg").let { !it.isFile || it.length() == 0L }
+            DiagLog.i("video upload ${video.id}: picture ${if (owes) "asked of the TV" else "came with it"}")
+            // Its picture comes from the TV itself where the phone's browser could not make one —
+            // plenty of films arrive without it, and the second of a batch owed every card after it
+            // a picture it never got (1.6.0). Tried over the moments after this, so a film already
+            // playing behind Home is never stopped for it.
+            if (owes) Wallpapers.requestFrames("upload")
+        }
         return json(state().put("saved", saved))
     }
 

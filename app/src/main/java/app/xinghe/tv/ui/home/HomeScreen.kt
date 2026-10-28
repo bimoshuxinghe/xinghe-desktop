@@ -231,7 +231,13 @@ fun HomeScreen(
     val liveFilm = remember { LiveFilm() }
     DisposableEffect(liveFilm) {
         LiveFilm.onHome = liveFilm
-        onDispose { if (LiveFilm.onHome === liveFilm) LiveFilm.onHome = null }
+        // Set for whoever needs the decoder for a moment (a film just uploaded wanting its picture);
+        // let goes with Home's film, whose turn it is once Home is gone.
+        Wallpapers.borrowDecoder = { body -> LiveFilm.onHome?.borrow(body) }
+        onDispose {
+            if (LiveFilm.onHome === liveFilm) LiveFilm.onHome = null
+            Wallpapers.borrowDecoder = null
+        }
     }
     // A screensaver of aerials over the aerial wallpaper carries the wallpaper's film on, one shot
     // from Home to screensaver: the apps fade, the clock moves to the corner. Whether the film is
@@ -533,7 +539,9 @@ fun HomeScreen(
             }
             // The moving wallpaper's film (aerial films, or the owner's videos), under everything.
             if (Wallpapers.selectedId == Wallpapers.LIVE || Wallpapers.videoSelected) {
-                LiveWallpaper(
+                // Its own annotation says so: the aerial films are still played by ExoPlayer.
+            @OptIn(androidx.media3.common.util.UnstableApi::class)
+            LiveWallpaper(
                     // The video wallpaper keeps playing through the all-apps view: the grid's
                     // background is transparent there, the film showing behind the rows. The
                     // aerial films stop on a keypress, on the top row only, as before.

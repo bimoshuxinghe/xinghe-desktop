@@ -3,6 +3,7 @@ package app.xinghe.tv.wallpaper
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.util.Log
+import app.xinghe.tv.system.DiagLog
 import org.json.JSONObject
 import java.io.File
 import java.util.UUID
@@ -69,6 +70,10 @@ object ScreensaverVideos {
             File(staging, "info.json").writeText(JSONObject().put("name", title).toString())
             if (thumb != null && thumb.isFile && thumb.length() in 1..(2L * 1024 * 1024)) {
                 thumb.inputStream().use { input -> File(staging, "thumb.jpg").outputStream().use { input.copyTo(it) } }
+            } else {
+                // Nothing said, nothing kept, and no way to know later why the card is empty: it is
+                // the one question worth writing down when a film arrives without a picture.
+                DiagLog.i("video upload: picture ${thumb?.length() ?: 0} bytes was not kept")
             }
             check(staging.renameTo(target))
             ScreensaverVideo(id, title, File(target, "video.mp4"))

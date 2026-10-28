@@ -3,6 +3,7 @@ package app.xinghe.tv.wallpaper
 import android.content.Context
 import android.media.MediaMetadataRetriever
 import android.os.Build
+import android.os.SystemClock
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -18,11 +19,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import app.xinghe.tv.media.FilmDecoder
+import app.xinghe.tv.system.DiagLog
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -75,6 +79,9 @@ object Wallpapers {
     private const val DAILY_RETRY_MS = 30 * 60 * 1000L
     /** Pictures up to this width are cards: the phone-made thumbnail serves them first. */
     private const val THUMB_W = 512
+    /** What the pickers ask a picture at: the TV's own folder, and every film on the phone's page. */
+    private const val CARD_W = 384
+    private const val CARD_H = 216
     const val AUTO = "auto"
     const val ROTATE_PHOTOS = "photos:rotate"
     const val LIVE = "aerial:live"
@@ -174,6 +181,9 @@ object Wallpapers {
         scope.launch(Dispatchers.IO) { clearStaleUploads() }
         // Installs from before 1.42 have a baked picture but no copy yet.
         scope.launch(Dispatchers.IO) { keepForLockedBoot() }
+        // Nothing is playing yet, so the decoder is free: the films that came in without a picture
+        // of their own get one now, before the day's first film asks for the way.
+        scope.launch(Dispatchers.IO) { catchUpFrames("start") }
     }
 
     /**
@@ -318,9 +328,12 @@ object Wallpapers {
      * first frame should be (TCL 65S515D).
      */
     private fun videoFirstFrame(video: ScreensaverVideo, w: Int, h: Int): Bitmap? {
-        val cache = File(firstFrameDir, "first-${video.id}-${video.file.lastModified()}-${w}x$h.jpg")
+        val cache = frameCache(video, w, h)
         if (cache.exists()) BitmapFactory.decodeFile(cache.path)?.let { return it }
-        val frame = decodeFirstFrame(video.file, w, h) ?: return null
+        val opening = decodeFirstFrame(video.file, w, h) ?: return null
+        // Plenty of films open on a black frame and fade in: a card with a black picture on it
+        // looks no different from a card with nothing to show.
+        val frame = if (Images.blank(opening)) laterFrame(video.file, w, h)?.also { opening.recycle() } ?: opening else opening
         runCatching {
             cache.outputStream().use { frame.compress(Bitmap.CompressFormat.JPEG, 90, it) }
             // The same video's other sizes, or an older cut of it, are no longer of use.
@@ -330,6 +343,92 @@ object Wallpapers {
         }.onFailure { Log.w(TAG, "could not keep a video's first frame", it) }
         return frame
     }
+
+    /**
+     * A frame from further into the film, for one whose first frame is nothing to look at. The
+     * phone's page takes the same trouble with the picture it sends along.
+     */
+    private fun laterFrame(file: File, w: Int, h: Int): Bitmap? {
+        val path = file.absolutePath
+        val length = retrieve(path) { it.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() }
+            ?.takeIf { it > 2_000 } ?: return null
+        for (ms in listOf(length / 10, length / 2)) {
+            val frame = retrieve(path) { it.getFrameAtTime(ms * 1000, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) }
+                ?: retrieve(path) { it.getFrameAtTime(ms * 1000, MediaMetadataRetriever.OPTION_CLOSEST) }
+            if (frame != null && !Images.blank(frame)) return sized(frame, w, h)
+        }
+        return null
+    }
+
+    /** Where a film's first frame at a size is kept, once it has been decoded once. */
+    private fun frameCache(video: ScreensaverVideo, w: Int, h: Int) =
+        File(firstFrameDir, "first-${video.id}-${video.file.lastModified()}-${w}x$h.jpg")
+
+    /**
+     * A picture of its own for every uploaded film, made here rather than waited for.
+     *
+     * The phone sends a frame of the film along with it, but its browser cannot decode every film
+     * this TV plays, and plenty arrive without one. Until a film has been played as the wallpaper,
+     * what is on file is all its card has to show — hence empty cards for a batch's second film
+     * and later, whose thumbnail had not come and whose frame this TV would not read while the
+     * wallpaper's player held its one decoder.
+     *
+     * Call off the main thread. It touches the decoder only when the way is free, or borrows it
+     * from the film on Home for the moment: a picture is not worth stopping a film that is playing.
+     * True when every film has one now.
+     */
+    fun catchUpFrames(reason: String): Boolean {
+        if (!started) return true
+        val missing = ScreensaverVideos.all(app).filter { !frameCache(it, CARD_W, CARD_H).exists() }
+        if (missing.isEmpty()) return true
+        if (FilmDecoder.held && borrowDecoder == null) {
+            DiagLog.i("video frames wait ($reason): ${missing.size} without a picture, the decoder is held")
+            return false
+        }
+        var made = 0
+        for (video in missing) {
+            val at = SystemClock.elapsedRealtime()
+            var frame: Bitmap? = null
+            val lender = borrowDecoder
+            // Borrowed rather than taken: a second decoder opened beside the film on Home stops
+            // that film where it stands (1.5.5), which a picture for a card does not pay for.
+            if (FilmDecoder.held) lender?.invoke { frame = videoFirstFrame(video, CARD_W, CARD_H) }
+            else frame = videoFirstFrame(video, CARD_W, CARD_H)
+            val takes = SystemClock.elapsedRealtime() - at
+            if (frame != null) made++
+            DiagLog.i("video frame ${video.name}: ${if (frame != null) "made in $takes ms" else "would not decode ($takes ms)"} ($reason)")
+            if (FilmDecoder.held && borrowDecoder == null) break
+        }
+        DiagLog.i("video frames: $made of ${missing.size} made ($reason)")
+        return missing.all { frameCache(it, CARD_W, CARD_H).exists() }
+    }
+
+    private var framesJob: Job? = null
+
+    /**
+     * [catchUpFrames] over the next few moments rather than at once: an upload has just been
+     * served, and a film playing behind Home keeps its decoder until it lets it go of its own
+     * accord. Nothing presses. What is still missing waits for the next start.
+     */
+    fun requestFrames(reason: String) {
+        if (!started) return
+        scope.launch {
+            framesJob?.cancel()
+            framesJob = scope.launch(Dispatchers.IO) {
+                repeat(4) { round ->
+                    if (catchUpFrames(reason)) return@launch
+                    delay(if (round == 0) 500L else 4_000L)
+                }
+            }
+        }
+    }
+
+    /**
+     * Set by Home's film: runs [body] — off the main thread — with the decoder let go for the
+     * moment, then asks for it back. A first frame takes a few hundred milliseconds, and the film
+     * picks up where it was left.
+     */
+    var borrowDecoder: ((body: () -> Unit) -> Unit)? = null
 
     /** Every way of asking for the first frame, until one answers. */
     private fun decodeFirstFrame(file: File, w: Int, h: Int): Bitmap? {
@@ -409,7 +508,7 @@ object Wallpapers {
             // A video whose own frame will not decode is left without a picture here, rather than
             // given a gradient: the pickers show which film it is by its name, and a stand-in
             // cached once would keep the card from ever showing the frame that came later.
-            WallpaperKind.Video -> videoPicture(wp.id, 384, 216, standIn = false)
+            WallpaperKind.Video -> videoPicture(wp.id, CARD_W, CARD_H, standIn = false)
             else -> picture(wp, 384, 216)
         }
         if (b != null) synchronized(thumbs) { thumbs[id] = b }
@@ -640,6 +739,10 @@ object Wallpapers {
                     rebuildBackdrop()
                 }
             }
+            // A film that came in without a picture of its own: try for it here, where nothing is
+            // playing yet if nothing is playing. What the film on Home keeps hold of waits its turn
+            // (requestFrames, and the next start).
+            catchUpFrames("rescan")
         }
     }
 

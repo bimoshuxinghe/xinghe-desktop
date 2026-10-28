@@ -1273,12 +1273,17 @@ function videoRow(video) {
   const row = el('div', 'item');
   const thumb = el('img', 'thumb');
   const href = `${base}thumb/${encodeURIComponent(id)}`;
-  // The picture can trail the film itself by a moment; ask once again rather than leave the tile
-  // blank for as long as the page stays open.
+  // The picture can trail the film itself by a moment: where the phone could not make one, the TV
+  // reads the film's own first frame, and that waits for the one decoder these TVs have to be free
+  // (a film playing behind Home lets it go for a moment). Ask again, later each time, rather than
+  // leave the tile blank for as long as the page stays open. The number keeps a failed answer from
+  // being served again out of the browser's own cache.
+  const again = [700, 2_500, 6_000, 12_000];
   thumb.onerror = () => {
-    if (thumb.dataset.retried) return;
-    thumb.dataset.retried = '1';
-    setTimeout(() => { thumb.removeAttribute('src'); thumb.src = href; }, 700);
+    const tries = Number(thumb.dataset.retried || 0);
+    if (tries >= again.length) return;
+    thumb.dataset.retried = String(tries + 1);
+    setTimeout(() => { thumb.removeAttribute('src'); thumb.src = `${href}?again=${tries + 1}`; }, again[tries]);
   };
   thumb.src = href;
   thumb.alt = ''; thumb.loading = 'lazy';
