@@ -270,23 +270,6 @@
   </div>
   <p class="foot" id="wxHint"></p>
 
-  <h2 data-i18n="tool_h"></h2>
-  <div class="list">
-    <div class="item"><span class="txt" data-i18n="tool_ping"></span><span class="val" id="toolPing">—</span></div>
-    <div class="item"><span class="txt" data-i18n="tool_down"></span><span class="val" id="toolDown">—</span></div>
-    <div class="item"><span class="txt" data-i18n="tool_node"></span><span class="val" id="toolNode">—</span></div>
-  </div>
-  <div class="row"><button class="btn" id="toolSpeedBtn" data-i18n="tool_run"></button></div>
-  <p class="foot" id="toolSpeedHint"></p>
-
-  <h2 data-i18n="tool_clean_h"></h2>
-  <div class="list">
-    <div class="item"><span class="txt" data-i18n="tool_mem"></span><span class="val" id="toolMem">—</span></div>
-    <div class="item"><span class="txt" data-i18n="tool_bg"></span><span class="val" id="toolBg">—</span></div>
-  </div>
-  <div class="row"><button class="btn plain" id="toolCleanBtn" data-i18n="tool_clean_run"></button></div>
-  <p class="foot" id="toolCleanHint"></p>
-
   <h2 data-i18n="this_tv"></h2>
   <div class="list">
     <div class="item"><span class="txt" data-i18n="tv_model"></span><span class="val">{{DEVICE}}</span></div>
@@ -327,9 +310,10 @@ let state = null, stateJson = '';
 
 // The language: ?lang=ru in the address, else the one picked under More (kept on the phone), else the
 // first of the phone's preferred languages that has a table, else English. Keys are in KEYS, one array of texts per language.
-const KEYS = ["screensaver", "screensaver_short", "ss_aerial", "ss_photos", "ss_clock", "focus", "focus_high", "focus_standard", "weather", "city_ph", "set", "upload_label", "feedback_h", "feedback_hint", "diag_show", "diag_copy", "diag_github", "hint_aerial", "hint_photos", "hint_clock", "g_live", "g_live_sub", "g_daily", "g_daily_sub", "g_photo", "g_builtin", "g_auto", "toast_wallpaper", "aria_delete", "confirm_delete", "wx_clear", "wx_partlycloudy", "wx_cloudy", "wx_fog", "wx_rain", "wx_snow", "wx_thunder", "wx_chosen", "wx_auto_btn", "toast_auto", "wx_guessed", "wx_none", "tag_source", "aria_rename", "toast_renamed", "toast_name_reset", "toast_rename_fail", "aria_reset_icon", "toast_icon_reset", "focus_hint_standard", "focus_hint_high", "daily_title", "daily_caption", "rotate_title", "rotate_caption", "empty_photos", "add_second", "toast_tv_updated", "sending_n", "toast_added", "toast_no_photos", "toast_send_fail", "toast_city_set", "toast_city_nf", "toast_set_fail", "toast_sending_icon", "toast_icon_set", "toast_icon_bad", "diag_collecting", "toast_diag_fail", "toast_copied", "toast_copy_manual", "language", "hint_follows", "ss_videos", "hint_videos", "videos_h", "videos_upload", "videos_hint", "videos_empty", "confirm_video_delete", "toast_videos_added", "toast_video_bad", "sending_video", "hint_system", "tab_home", "tab_more", "current_wp", "cancel", "save", "name_ph", "rename_hint", "change_icon", "this_tv", "folder_count", "folder_ph", "inputs_h", "inputs_hint", "rename_hint_app", "was_named", "arrange_hint", "arrange_unready", "hidden_h", "hidden_none", "hidden_locked", "show_app", "hide_app", "to_folder", "new_folder", "out_of_folder", "ungroup", "ungroup_confirm", "folder_hint", "toast_hidden", "toast_shown", "toast_in_folder", "toast_out_folder", "toast_ungrouped", "tab_looks", "looks_title", "show_on_home", "source_device", "source_plain", "source_device_hint", "tv_model", "g_video", "tool_h", "tool_ping", "tool_down", "tool_node", "tool_run", "tool_working", "tool_failed", "tool_step_ping", "tool_step_down", "tool_step_pull", "tool_mem", "tool_bg", "tool_clean_run", "tool_cleaning", "tool_cleaned", "tool_refused", "tool_clean_h", "tool_unit", "tool_unit_ms", "tool_unit_mbps"];
+const KEYS = ["screensaver", "screensaver_short", "ss_aerial", "ss_photos", "ss_clock", "focus", "focus_high", "focus_standard", "weather", "city_ph", "set", "upload_label", "feedback_h", "feedback_hint", "diag_show", "diag_copy", "diag_github", "hint_aerial", "hint_photos", "hint_clock", "g_live", "g_live_sub", "g_daily", "g_daily_sub", "g_photo", "g_builtin", "g_auto", "toast_wallpaper", "aria_delete", "confirm_delete", "wx_clear", "wx_partlycloudy", "wx_cloudy", "wx_fog", "wx_rain", "wx_snow", "wx_thunder", "wx_chosen", "wx_auto_btn", "toast_auto", "wx_guessed", "wx_none", "tag_source", "aria_rename", "toast_renamed", "toast_name_reset", "toast_rename_fail", "aria_reset_icon", "toast_icon_reset", "focus_hint_standard", "focus_hint_high", "daily_title", "daily_caption", "rotate_title", "rotate_caption", "empty_photos", "add_second", "toast_tv_updated", "sending_n", "toast_added", "toast_no_photos", "toast_send_fail", "toast_city_set", "toast_city_nf", "toast_set_fail", "toast_sending_icon", "toast_icon_set", "toast_icon_bad", "diag_collecting", "toast_diag_fail", "toast_copied", "toast_copy_manual", "language", "hint_follows", "ss_videos", "hint_videos", "videos_h", "videos_upload", "videos_hint", "videos_empty", "confirm_video_delete", "toast_videos_added", "toast_video_bad", "sending_video", "hint_system", "tab_home", "tab_more", "current_wp", "cancel", "save", "name_ph", "rename_hint", "change_icon", "this_tv", "folder_count", "folder_ph", "inputs_h", "inputs_hint", "rename_hint_app", "was_named", "arrange_hint", "arrange_unready", "hidden_h", "hidden_none", "hidden_locked", "show_app", "hide_app", "to_folder", "new_folder", "out_of_folder", "ungroup", "ungroup_confirm", "folder_hint", "toast_hidden", "toast_shown", "toast_in_folder", "toast_out_folder", "toast_ungrouped", "tab_looks", "looks_title", "show_on_home", "source_device", "source_plain", "source_device_hint", "tv_model", "g_video"];
 const TEXTS = {
  "zh": [
+
   "屏幕保护程序",
   "屏保",
   "航拍",
@@ -455,29 +439,10 @@ const TEXTS = {
   "默认",
   "选一个设备，电视上这个信号源的图标会换成它的样子，名字也跟着变；自己起的名字会被替换。",
   "型号",
-  "我的视频",
-  "网络与清理",
-  "延迟",
-  "下载",
-  "节点",
-  "开始测速",
-  "正在测速…",
-  "连不上测速节点，检查一下网络。",
-  "正在测延迟 · {node}",
-  "正在测下载 · {node}",
-  "已下载 {mb} MB",
-  "内存",
-  "后台进程",
-  "清理后台",
-  "正在清理…",
-  "已停止 {killed} 个进程，清出缓存 {cache} MB",
-  "系统保留了 {n} 个——Android 8 起，第三方应用无权结束别人的进程。",
-  "后台清理",
-  "MB",
-  "毫秒",
   "Mbps"
- ],
+  ],
  "en": [
+
   "Screensaver",
   "Screensaver",
   "Aerial",
@@ -603,29 +568,10 @@ const TEXTS = {
   "Default",
   "Pick a device and the tile on the TV takes its look and its name; a name you typed is replaced.",
   "Model",
-  "My Videos",
-  "Network and cleanup",
-  "Latency",
-  "Download",
-  "Node",
-  "Start the test",
-  "Testing…",
-  "Could not reach a test node — check the network.",
-  "Measuring latency · {node}",
-  "Measuring download · {node}",
-  "Downloaded {mb} MB",
-  "Memory",
-  "Background processes",
-  "Clean up",
-  "Cleaning…",
-  "Stopped {killed} processes, freed {cache} MB of cache",
-  "The system kept {n} — since Android 8 an app may not stop another app's processes.",
-  "Background cleanup",
-  "MB",
-  "ms",
   "Mbps"
- ],
+  ],
  "ru": [
+
   "Заставка",
   "Заставка",
   "Аэросъёмка",
@@ -751,29 +697,10 @@ const TEXTS = {
   "По умолчанию",
   "Выберите устройство — плитка на телевизоре примет его вид и название; введённое вами название заменится.",
   "Модель",
-  "Мои видео",
-  "Сеть и очистка",
-  "Задержка",
-  "Загрузка",
-  "Узел",
-  "Начать тест",
-  "Идёт тест…",
-  "Не удалось связаться с узлом — проверьте сеть.",
-  "Измеряем задержку · {node}",
-  "Измеряем скорость · {node}",
-  "Скачано {mb} МБ",
-  "Память",
-  "Фоновые процессы",
-  "Очистить",
-  "Идёт очистка…",
-  "Остановлено процессов: {killed}, освобождено кэша: {cache} МБ",
-  "Система оставила {n} — с Android 8 приложение не может останавливать чужие процессы.",
-  "Очистка фона",
-  "МБ",
-  "мс",
   "Mbps"
- ],
+  ],
  "uk": [
+
   "Заставка",
   "Заставка",
   "Аерозйомка",
@@ -899,29 +826,10 @@ const TEXTS = {
   "Типово",
   "Виберіть пристрій — плитка на телевізорі набуде його вигляду й назви; введену вами назву буде замінено.",
   "Модель",
-  "Мої відео",
-  "Мережа та очищення",
-  "Затримка",
-  "Завантаження",
-  "Вузол",
-  "Почати тест",
-  "Триває тест…",
-  "Не вдалося зв'язатися з вузлом — перевірте мережу.",
-  "Вимірюємо затримку · {node}",
-  "Вимірюємо швидкість · {node}",
-  "Завантажено {mb} МБ",
-  "Пам’ять",
-  "Фонові процеси",
-  "Очистити",
-  "Триває очищення…",
-  "Зупинено процесів: {killed}, звільнено кэш: {cache} МБ",
-  "Система залишила {n} — з Android 8 застосунок не може зупиняти чужі процеси.",
-  "Очищення фону",
-  "МБ",
-  "мс",
   "Mbps"
- ],
+  ],
  "kk": [
+
   "Экран қорғаушы",
   "Экран қорғаушы",
   "Аэрожиын",
@@ -1047,28 +955,8 @@ const TEXTS = {
   "Әдепкі",
   "Құрылғыны таңдасаңыз, теледидардағы плитка оның түрі мен атауын алады; өзіңіз жазған атау ауыстырылады.",
   "Модель",
-  "Видеоларым",
-  "Желі және тазарту",
-  "Кешіктіру",
-  "Жүктеу",
-  "Түйін",
-  "Сынақты бастау",
-  "Сынақ жүріп жатыр…",
-  "Түйінге қосылу мүмкін болмады — желіні тексеріңіз.",
-  "Кешіктіруді өлшейміз · {node}",
-  "Жүктемені өлшейміз · {node}",
-  "{mb} МБ жүктелді",
-  "Жад",
-  "Фондық процестер",
-  "Тазарту",
-  "Тазартылуда…",
-  "{killed} процесс тоқтатылды, {cache} МБ кэш босатылды",
-  "Жүйе {n} процессты қалдырды — Android 8-ден бастап қолданба басқа процестерді тоқтата алмайды.",
-  "Фонды тазарту",
-  "МБ",
-  "мс",
   "Mbps"
- ]
+  ]
 };
 const LANGS = Object.keys(TEXTS);
 const LANG = (() => {
@@ -1399,86 +1287,6 @@ async function uploadVideos(e) {
 /* More tab: focus style and weather. */
 const weatherNames = { clear: t('wx_clear'), partlycloudy: t('wx_partlycloudy'), cloudy: t('wx_cloudy'), fog: t('wx_fog'), rain: t('wx_rain'), snow: t('wx_snow'), thunder: t('wx_thunder') };
 
-/* The TV's own tools, seen from the phone: how fast the line is, and what runs behind the screen.
-   The TV does the measuring; the phone only reads the numbers and shows them. */
-let speedPolling = false;
-function renderTools() {
-  const st = toolsState;
-  $('#toolPing').textContent = st.ping ? `${st.ping} ${t('tool_unit_ms')}` : '—';
-  $('#toolDown').textContent = st.down ? `${st.down.toFixed(1)} ${t('tool_unit_mbps')}` : '—';
-  $('#toolNode').textContent = st.node || '—';
-  const mem = $('#toolMem'), bg = $('#toolBg');
-  mem.textContent = st.memTotal ? `${st.memUsed} / ${st.memTotal} ${t('tool_unit')}` : '—';
-  bg.textContent = st.background ? `${st.background}` : '—';
-}
-const toolsState = { ping: 0, down: 0, node: '', memUsed: 0, memTotal: 0, background: 0, running: false };
-
-function speedStepText(s) {
-  if (!s || !s.running) return '';
-  if (s.phase === 'ping' && s.node) return t('tool_step_ping', { node: s.node });
-  if (s.phase === 'download' && s.node) return t('tool_step_down', { node: s.node });
-  if (s.phase === 'pull') return t('tool_step_pull', { mb: s.doneMb });
-  return t('tool_working');
-}
-async function pollSpeed() {
-  let s;
-  try { s = await api('api/speedtest'); } catch (e) { speedPolling = false; return; }
-  if (s.running) {
-    toolsState.running = true;
-    $('#toolSpeedHint').textContent = speedStepText(s);
-    $('#toolSpeedBtn').disabled = true;
-    setTimeout(pollSpeed, 800);
-  } else {
-    speedPolling = false;
-    toolsState.running = false;
-    $('#toolSpeedBtn').disabled = false;
-    if (s.error) {
-      $('#toolSpeedHint').textContent = t('tool_failed');
-    } else {
-      toolsState.ping = s.ping; toolsState.down = s.down; toolsState.node = s.node;
-      $('#toolSpeedHint').textContent = '';
-      renderTools();
-    }
-  }
-}
-async function startSpeed() {
-  if (speedPolling) return;
-  try { await api('api/speedtest', {}); } catch (e) { toast(t('tool_failed')); return; }
-  speedPolling = true;
-  $('#toolSpeedHint').textContent = t('tool_working');
-  $('#toolSpeedBtn').disabled = true;
-  pollSpeed();
-}
-async function loadToolStatus() {
-  let s;
-  try { s = await api('api/cleanup'); } catch (e) { return; }
-  toolsState.memUsed = s.memUsed; toolsState.memTotal = s.memTotal; toolsState.background = s.background;
-  renderTools();
-  // The last test's numbers are still on the TV: show them, so a phone that opens the page later
-  // sees what the line was measured at, not empty dashes.
-  try {
-    const sp = await api('api/speedtest');
-    if (!sp.running && !sp.error && sp.node) {
-      toolsState.ping = sp.ping; toolsState.down = sp.down; toolsState.node = sp.node;
-      renderTools();
-    }
-  } catch (e) {}
-}
-async function runCleanup() {
-  const btn = $('#toolCleanBtn');
-  btn.disabled = true;
-  $('#toolCleanHint').textContent = t('tool_cleaning');
-  let s;
-  try { s = await api('api/cleanup', {}); } catch (e) { btn.disabled = false; return; }
-  btn.disabled = false;
-  const hint = $('#toolCleanHint');
-  hint.textContent = t('tool_cleaned', { killed: s.killed, cache: s.cacheMb });
-  if (s.refused > 0) hint.textContent += ' ' + t('tool_refused', { n: s.refused });
-  toolsState.memUsed = s.memUsed; toolsState.memTotal = s.memTotal; toolsState.background = s.background;
-  renderTools();
-}
-$('#toolSpeedBtn').onclick = startSpeed;
-$('#toolCleanBtn').onclick = runCleanup;
 
 function renderMore() {
   document.querySelectorAll('#focus [data-style]').forEach(b => b.setAttribute('aria-checked', b.dataset.style === state.focusStyle ? 'true' : 'false'));
@@ -1492,11 +1300,6 @@ function renderMore() {
     b.onclick = async () => { try { take(await api('api/weather/auto', {})); toast(t('toast_auto')); } catch (e) { toast(t('toast_set_fail')); } };
     hint.append(b);
   } else hint.textContent = w.place ? t('wx_guessed', { place: w.place }) : t('wx_none');
-  renderTools();
-  // The memory and the process count move on their own, so they are read afresh now and then —
-  // but not on every poll of the page, which asks for the state every few seconds.
-  const now = Date.now();
-  if (now - (loadToolStatus.last || 0) > 5000) { loadToolStatus.last = now; loadToolStatus(); }
 }
 function renderInputs() {
   const inputs = state.inputs || [];

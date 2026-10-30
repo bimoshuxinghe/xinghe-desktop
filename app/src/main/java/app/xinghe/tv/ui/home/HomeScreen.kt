@@ -72,8 +72,6 @@ import app.xinghe.tv.R
 import app.xinghe.tv.settings.AerialSettings
 import app.xinghe.tv.apps.AppEntry
 import app.xinghe.tv.ui.control.ControlCenter
-import app.xinghe.tv.ui.tools.CleanupSheet
-import app.xinghe.tv.ui.tools.SpeedTestSheet
 import app.xinghe.tv.ui.wallpaper.VideosSheet
 import app.xinghe.tv.ui.wallpaper.WallpaperSheet
 import app.xinghe.tv.wallpaper.ScreensaverMode
@@ -907,16 +905,6 @@ fun HomeScreen(
         // The week's weather, out of the clock.
         WeatherSheet(
             visible = overlay is Overlay.Weather,
-            onDismiss = { vm.overlay = Overlay.None },
-        )
-
-        // How fast the line is, and what runs behind the screen.
-        SpeedTestSheet(
-            visible = overlay is Overlay.SpeedTest,
-            onDismiss = { vm.overlay = Overlay.None },
-        )
-        CleanupSheet(
-            visible = overlay is Overlay.Cleanup,
             onDismiss = { vm.overlay = Overlay.None },
         )
 

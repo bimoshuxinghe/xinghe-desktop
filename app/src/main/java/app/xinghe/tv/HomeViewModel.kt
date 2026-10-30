@@ -54,10 +54,6 @@ sealed interface Overlay {
     data class Pin(val mode: PinMode, val onDone: () -> Unit) : Overlay
     /** The week's weather, opened from the clock: the forecast for the place it shows. */
     data object Weather : Overlay
-    /** How fast this TV's line is, measured against a mirror the TV itself pulls a file from. */
-    data object SpeedTest : Overlay
-    /** What runs behind the screen, and what can be let go of. */
-    data object Cleanup : Overlay
 }
 
 enum class CcPage { Main, Inputs, InputSettings, Setup }
