@@ -600,8 +600,14 @@ class MainActivity : ComponentActivity() {
             if (Build.VERSION.SDK_INT >= 24) cm.registerDefaultNetworkCallback(networkCallback)
             else cm.registerNetworkCallback(NetworkRequest.Builder().build(), networkCallback)
         }
-        // Apps can change while Aerial is in the background without it hearing about it.
-        vm.reload()
+        // Apps can change while Aerial is in the background without it hearing about it: the
+        // package receiver above is unregistered in onStop, so nothing arrives then.
+        // reloadIfPackagesChanged (above) already reloads when PackageManager's change counter has
+        // moved (Android 8+), and reloads unconditionally on older Android, where there is none.
+        // A reload here as well threw that check away: every return to Home rebuilt all the tiles
+        // for nothing (upstream measured 100-380 ms, main thread held 204 ms at times -- when keys
+        // stop responding), and on a cold start it cancelled the load init() had begun and ran it
+        // again. Inputs still refresh: resumeWork() in onResume probes sources, network, brightness.
         Wallpapers.refreshDailyIfStale()
         Wallpapers.rotateIfDue()
         Weather.refreshIfStale()

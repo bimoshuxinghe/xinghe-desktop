@@ -96,4 +96,22 @@ class ScreensaverVideosTest {
         assertTrue(photo.exists())
         assertFalse(ScreensaverVideos.delete(context, film.name))
     }
+
+    @Test
+    fun longTitleKeepsItsExtension() {
+        // Cut first, a long name lost its .mp4 and the film was refused (upstream PR #1033).
+        assertEquals("a".repeat(116) + ".mp4", ScreensaverVideos.titleOf("a".repeat(116) + ".mp4"))
+        // Shorter than the cap: untouched.
+        assertEquals("film.mp4", ScreensaverVideos.titleOf("film.mp4"))
+        // An ASCII name over the cap is cut, extension kept.
+        assertEquals("a".repeat(116) + ".mp4", ScreensaverVideos.titleOf("a".repeat(200) + ".mp4"))
+        // A name of supplementary characters (2 units each) is cut at 58 whole characters.
+        assertEquals("\uD840\uDC00".repeat(58) + ".mov", ScreensaverVideos.titleOf("\uD840\uDC00".repeat(70) + ".mov"))
+        // The cut never leaves half a character: the whole one steps aside.
+        assertEquals("a" + "\uD840\uDC00".repeat(57) + ".mov", ScreensaverVideos.titleOf("a" + "\uD840\uDC00".repeat(58) + ".mov"))
+        // No extension, or not a film: refused.
+        assertNull(ScreensaverVideos.titleOf("no extension"))
+        assertNull(ScreensaverVideos.titleOf("photo.png"))
+        assertNull(ScreensaverVideos.titleOf(".mp4"))
+    }
 }
